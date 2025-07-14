@@ -58,17 +58,7 @@ for idx, gid in enumerate(item_group_ids):
     if gid is not None:
         group_to_items[gid].append(idx)
 
-# Pre-check: Warn and exit if any group exceeds container capacity
-group_infeasible = False
-for gid, indices in group_to_items.items():
-    group_weight = sum(item_weights[i] for i in indices)
-    group_volume = sum(item_volumes[i] for i in indices)
-    if group_weight > container_weight or group_volume > container_volume:
-        print(f'ERROR: Group {gid} exceeds container capacity! (group_weight={group_weight} (container max weight {container_weight}), group_volume={group_volume} (container max volume {container_volume}))')
-        group_infeasible = True
-if group_infeasible:
-    print('At least one group cannot fit in a container. Exiting.')
-    sys.exit(1)
+## Pre-check removed: groups can now be split, so infeasible groups are allowed (soft grouping)
 
 # Upper bound on containers: one per item (worst case)
 max_containers = num_items
@@ -99,17 +89,27 @@ for j in range(max_containers):
     for i in range(num_items):
         model.Add(x[i, j] <= y[j])
 
-# Grouping constraints: items with same group_id must be in the same container
-for group_items in group_to_items.values():
-    if len(group_items) > 1:
-        for j in range(max_containers):
-            # All x[i, j] for i in group_items must be equal for each container j
-            first = group_items[0]
-            for other in group_items[1:]:
-                model.Add(x[first, j] == x[other, j])
 
-# Objective: minimize number of containers used
-model.Minimize(sum(y[j] for j in range(max_containers)))
+# Soft grouping: penalize splitting a group across multiple containers
+group_penalty_lambda = 1  # Penalty weight for splitting a group (can be parameterized)
+group_ids = list(group_to_items.keys())
+group_in_j = {}  # group_in_j[g, j] = 1 if any item of group g is in container j
+group_in_containers = {}  # group_in_containers[g] = number of containers group g is split across
+for g in group_ids:
+    for j in range(max_containers):
+        group_in_j[g, j] = model.NewBoolVar(f'group_{g}_in_{j}')
+        # group_in_j[g, j] >= x[i, j] for any i in group g
+        for i in group_to_items[g]:
+            model.AddImplication(x[i, j], group_in_j[g, j])
+    # group_in_containers[g] = sum_j group_in_j[g, j]
+    group_in_containers[g] = model.NewIntVar(1, max_containers, f'group_{g}_num_containers')
+    model.Add(group_in_containers[g] == sum(group_in_j[g, j] for j in range(max_containers)))
+
+
+# Objective: minimize number of containers used + penalty for group splits
+# For each group, penalize (number of containers used by group - 1)
+group_split_penalty = sum(group_in_containers[g] - 1 for g in group_ids) if group_ids else 0
+model.Minimize(sum(y[j] for j in range(max_containers)) + group_penalty_lambda * group_split_penalty)
 
 
 # Solve
@@ -133,9 +133,16 @@ output_md = []
 output_md.append('## OUTPUTS')
 output_md.append(f'Solver status: {status_dict.get(status, status)}')
 
+
 if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-    print(f'\nMinimum containers used: {int(solver.ObjectiveValue())}')
-    output_md.append(f'- Minimum containers used: {int(solver.ObjectiveValue())}')
+    min_containers = int(sum(solver.Value(y[j]) for j in range(max_containers)))
+    # Compute group splits
+    group_splits = {g: solver.Value(group_in_containers[g]) - 1 for g in group_ids}
+    total_group_splits = sum(group_splits.values())
+    print(f'\nMinimum containers used: {min_containers}')
+    print(f'Total group splits (penalized): {total_group_splits}')
+    output_md.append(f'- Minimum containers used: {min_containers}')
+    output_md.append(f'- Total group splits (penalized): {total_group_splits}')
     output_md.append('')
     # Rebase container numbers
     used_container_indices = [j for j in range(max_containers) if solver.Value(y[j])]
@@ -154,6 +161,21 @@ if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             output_md.append(f'| {item_ids[i]} | {item_weights[i]} | {item_volumes[i]} | {item_group_ids[i]} |')
         output_md.append(f'**Total for container {new_j}: weight = {total_weight} ({pct_weight:.1f}% of max), volume = {total_volume} ({pct_volume:.1f}% of max)**\n')
         print(f'Container {new_j}: items {[f"{item_ids[i]}(group_id={item_group_ids[i]})" for i in items_in_container]}, total loaded weight: {total_weight} ({pct_weight:.1f}% of max), total loaded volume: {total_volume} ({pct_volume:.1f}% of max)')
+    # Report group splits
+    if group_ids:
+        output_md.append('### Group Splits')
+        output_md.append('| Group id | Containers used | Splits (penalized) | Container numbers |')
+        output_md.append('|----------|----------------|--------------------|-------------------|')
+        for g in group_ids:
+            # Find which rebased containers this group appears in
+            containers_for_group = []
+            for old_j in used_container_indices:
+                # If any item of group g is in old_j, group appears in this container
+                if any(solver.Value(x[i, old_j]) for i in group_to_items[g]):
+                    containers_for_group.append(str(container_rebase[old_j]))
+            containers_str = ', '.join(containers_for_group)
+            output_md.append(f'| {g} | {solver.Value(group_in_containers[g])} | {group_splits[g]} | {containers_str} |')
+        output_md.append('')
 else:
     print('No solution found.')
     output_md.append('No solution found.')

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "NetConsoleApp": {
+      "commandName": "Project",
+      "commandLineArgs": "D:\\repos\\personal-github\\container-optimizations\\input_data_50_to_split.json"
+    }
+  }
+}
