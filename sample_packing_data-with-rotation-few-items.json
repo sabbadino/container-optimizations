@@ -1,0 +1,11 @@
+{
+  "container": [10, 10, 10],
+  "boxes": [
+    {"size": [4, 4, 4], "rotation": "free"},
+    {"size": [3, 3, 6], "rotation": "z"},
+    {"size": [2, 5, 2], "rotation": "free"},
+    {"size": [2, 2, 2], "rotation": "none"},
+       {"size": [2, 2, 6], "rotation": "free"},
+    {"size": [3, 3, 6], "rotation": "z"}
+  ]
+}
