@@ -1,0 +1,65 @@
+# Container Bin Packing Result
+
+## INPUTS
+- Container volume capacity: 50
+- Container weight capacity: 20
+- Items:
+    - id: 1, weight: 1, volume: 2, group_id: 1
+    - id: 2, weight: 2, volume: 3, group_id: 1
+    - id: 3, weight: 1, volume: 2, group_id: 1
+    - id: 4, weight: 2, volume: 3, group_id: 1
+    - id: 5, weight: 1, volume: 2, group_id: 1
+    - id: 6, weight: 1, volume: 2, group_id: 2
+    - id: 7, weight: 2, volume: 4, group_id: 2
+    - id: 8, weight: 1, volume: 2, group_id: 2
+    - id: 9, weight: 2, volume: 4, group_id: 2
+    - id: 10, weight: 1, volume: 2, group_id: 2
+    - id: 11, weight: 1, volume: 1, group_id: 3
+    - id: 12, weight: 1, volume: 1, group_id: 3
+    - id: 13, weight: 1, volume: 1, group_id: 3
+    - id: 14, weight: 1, volume: 1, group_id: 3
+    - id: 15, weight: 1, volume: 1, group_id: 3
+    - id: 16, weight: 3, volume: 5, group_id: 4
+    - id: 17, weight: 1, volume: 2, group_id: 4
+    - id: 18, weight: 3, volume: 5, group_id: 4
+    - id: 19, weight: 1, volume: 2, group_id: 4
+    - id: 20, weight: 3, volume: 5, group_id: 4
+    - id: 21, weight: 2, volume: 3, group_id: 5
+    - id: 22, weight: 1, volume: 2, group_id: 5
+    - id: 23, weight: 2, volume: 3, group_id: 5
+    - id: 24, weight: 1, volume: 2, group_id: 5
+    - id: 25, weight: 2, volume: 3, group_id: 5
+    - id: 26, weight: 1, volume: 1, group_id: None
+    - id: 27, weight: 1, volume: 2, group_id: None
+    - id: 28, weight: 2, volume: 3, group_id: None
+    - id: 29, weight: 1, volume: 2, group_id: None
+    - id: 30, weight: 1, volume: 1, group_id: None
+    - id: 31, weight: 1, volume: 2, group_id: None
+    - id: 32, weight: 2, volume: 3, group_id: None
+    - id: 33, weight: 1, volume: 2, group_id: None
+    - id: 34, weight: 1, volume: 1, group_id: None
+    - id: 35, weight: 1, volume: 2, group_id: None
+    - id: 36, weight: 2, volume: 3, group_id: None
+    - id: 37, weight: 1, volume: 2, group_id: None
+    - id: 38, weight: 1, volume: 1, group_id: None
+    - id: 39, weight: 1, volume: 2, group_id: None
+    - id: 40, weight: 2, volume: 3, group_id: None
+    - id: 41, weight: 1, volume: 2, group_id: None
+    - id: 42, weight: 1, volume: 1, group_id: None
+    - id: 43, weight: 1, volume: 2, group_id: None
+    - id: 44, weight: 2, volume: 3, group_id: None
+    - id: 45, weight: 1, volume: 2, group_id: None
+    - id: 46, weight: 1, volume: 1, group_id: None
+    - id: 47, weight: 1, volume: 2, group_id: None
+    - id: 48, weight: 2, volume: 3, group_id: None
+    - id: 49, weight: 1, volume: 2, group_id: None
+    - id: 50, weight: 1, volume: 1, group_id: None
+
+---
+## OUTPUTS
+Solver status: OPTIMAL
+- Minimum containers used: 4
+  - Container 0: items ['21(group_id=5)', '22(group_id=5)', '23(group_id=5)', '24(group_id=5)', '25(group_id=5)', '46(group_id=None)', '50(group_id=None)'], total loaded weight: 10 (50.0% of max), total loaded volume: 15 (30.0% of max)
+  - Container 3: items ['1(group_id=1)', '2(group_id=1)', '3(group_id=1)', '4(group_id=1)', '5(group_id=1)', '16(group_id=4)', '17(group_id=4)', '18(group_id=4)', '19(group_id=4)', '20(group_id=4)', '38(group_id=None)'], total loaded weight: 19 (95.0% of max), total loaded volume: 32 (64.0% of max)
+  - Container 8: items ['6(group_id=2)', '7(group_id=2)', '8(group_id=2)', '9(group_id=2)', '10(group_id=2)', '11(group_id=3)', '12(group_id=3)', '13(group_id=3)', '14(group_id=3)', '15(group_id=3)', '28(group_id=None)', '32(group_id=None)', '44(group_id=None)', '48(group_id=None)'], total loaded weight: 20 (100.0% of max), total loaded volume: 31 (62.0% of max)
+  - Container 49: items ['26(group_id=None)', '27(group_id=None)', '29(group_id=None)', '30(group_id=None)', '31(group_id=None)', '33(group_id=None)', '34(group_id=None)', '35(group_id=None)', '36(group_id=None)', '37(group_id=None)', '39(group_id=None)', '40(group_id=None)', '41(group_id=None)', '42(group_id=None)', '43(group_id=None)', '45(group_id=None)', '47(group_id=None)', '49(group_id=None)'], total loaded weight: 20 (100.0% of max), total loaded volume: 34 (68.0% of max)
