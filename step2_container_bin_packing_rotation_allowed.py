@@ -7,9 +7,9 @@ import sys
 from ortools.sat.python import cp_model
 from load_utils import load_data_from_json
 
-# Usage: python container_bin_packing-1-geometry.py <input_json_file>
+# Usage: python step2_container_bin_packing_rotation_allowed.py <input_json_file>
 if len(sys.argv) < 2:
-    print("Usage: python container_bin_packing-1-geometry.py <input_json_file>")
+    print("Usage: python step2_container_bin_packing_rotation_allowed.py <input_json_file>")
     sys.exit(1)
 
 
