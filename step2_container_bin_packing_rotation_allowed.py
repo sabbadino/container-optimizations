@@ -59,6 +59,7 @@ l_eff = [model.NewIntVar(0, container[0], f'l_eff_{i}') for i in range(n)]
 w_eff = [model.NewIntVar(0, container[1], f'w_eff_{i}') for i in range(n)]
 h_eff = [model.NewIntVar(0, container[2], f'h_eff_{i}') for i in range(n)]
 
+
 # Link orientation to effective dimensions
 for i in range(n):
     for k, (l, w, h) in enumerate(perms_list[i]):
@@ -66,60 +67,48 @@ for i in range(n):
         model.Add(w_eff[i] == w).OnlyEnforceIf(orient[i][k])
         model.Add(h_eff[i] == h).OnlyEnforceIf(orient[i][k])
 
-# No overlap constraint (manual for 3D, using effective dimensions)
+# Symmetry breaking for identical boxes (same size and allowed rotations)
 for i in range(n):
     for j in range(i + 1, n):
-        # At least one of the following must be true:
-        # i is left of j, i is right of j, i is in front of j, i is behind j, i is below j, i is above j
-        no_overlap = []
-        no_overlap.append(model.NewBoolVar(f'i{i}_left_of_j{j}'))
-        model.Add(x[i] + l_eff[i] <= x[j]).OnlyEnforceIf(no_overlap[-1])
-        no_overlap.append(model.NewBoolVar(f'i{i}_right_of_j{j}'))
-        model.Add(x[j] + l_eff[j] <= x[i]).OnlyEnforceIf(no_overlap[-1])
-        no_overlap.append(model.NewBoolVar(f'i{i}_front_of_j{j}'))
-        model.Add(y[i] + w_eff[i] <= y[j]).OnlyEnforceIf(no_overlap[-1])
-        no_overlap.append(model.NewBoolVar(f'i{i}_behind_of_j{j}'))
-        model.Add(y[j] + w_eff[j] <= y[i]).OnlyEnforceIf(no_overlap[-1])
-        no_overlap.append(model.NewBoolVar(f'i{i}_below_j{j}'))
-        model.Add(z[i] + h_eff[i] <= z[j]).OnlyEnforceIf(no_overlap[-1])
-        no_overlap.append(model.NewBoolVar(f'i{i}_above_j{j}'))
-        model.Add(z[j] + h_eff[j] <= z[i]).OnlyEnforceIf(no_overlap[-1])
-        model.AddBoolOr(no_overlap)
-
-# Inside container (using effective dimensions)
-for i in range(n):
-    model.Add(x[i] + l_eff[i] <= container[0])
-    model.Add(y[i] + w_eff[i] <= container[1])
-    model.Add(z[i] + h_eff[i] <= container[2])
+        # Check if boxes i and j are identical in size and allowed rotations
+        if (
+            boxes[i]['size'] == boxes[j]['size']
+            and boxes[i].get('rotation', 'free') == boxes[j].get('rotation', 'free')
+        ):
+            # Enforce lexicographical order on (x, y, z) for i < j
+            model.Add(x[i] <= x[j])
+            # Optionally, for stricter symmetry breaking, use y and z as tie-breakers
+            # model.Add(x[i] < x[j]).OnlyEnforceIf(model.NewBoolVar(f'sb_x_{i}_{j}'))
+            # model.Add(y[i] <= y[j]).OnlyEnforceIf(x[i] == x[j])
+            # model.Add(z[i] <= z[j]).OnlyEnforceIf((x[i] == x[j]) & (y[i] == y[j]))
 
 
-# No floating: each box is on the floor or on top of another box (using effective dimensions)
-on_floor_vars = []
-for i in range(n):
-    on_floor = model.NewBoolVar(f'on_floor_{i}')
-    on_floor_vars.append(on_floor)
-    model.Add(z[i] == 0).OnlyEnforceIf(on_floor)
-    on_another = []
-    for j in range(n):
-        if i == j:
-            continue
-        above = model.NewBoolVar(f'above_{i}_{j}')
-        model.Add(z[i] == z[j] + h_eff[j]).OnlyEnforceIf(above)
-        # Must overlap in x and y
-        model.Add(x[i] < x[j] + l_eff[j]).OnlyEnforceIf(above)
-        model.Add(x[i] + l_eff[i] > x[j]).OnlyEnforceIf(above)
-        model.Add(y[i] < y[j] + w_eff[j]).OnlyEnforceIf(above)
-        model.Add(y[i] + w_eff[i] > y[j]).OnlyEnforceIf(above)
-        on_another.append(above)
-    model.AddBoolOr([on_floor] + on_another)
+from model_constraints import add_no_overlap_constraint
+add_no_overlap_constraint(model, n, x, y, z, l_eff, w_eff, h_eff)
 
-# Prefer boxes on the floor when possible
-model.Maximize(sum(on_floor_vars))
+
+from model_constraints import add_inside_container_constraint
+add_inside_container_constraint(model, n, x, y, z, l_eff, w_eff, h_eff, container)
+
+
+
+
+from model_constraints import add_no_floating_constraint, get_total_floor_area_covered
+
+# Add no floating constraint
+on_floor_vars = add_no_floating_constraint(model, n, x, y, z, l_eff, w_eff, h_eff)
+# Maximize total covered floor area
+area_vars = get_total_floor_area_covered(model, n, on_floor_vars, l_eff, w_eff, container)
+model.Maximize(sum(area_vars))
+
 
 # Solve
+import time
 solver = cp_model.CpSolver()
-solver.parameters.max_time_in_seconds = 30  
+solver.parameters.max_time_in_seconds = 30
+start_time = time.time()
 status = solver.Solve(model)
+elapsed_time = time.time() - start_time
 
 # Print model status
 status_dict = {
@@ -129,7 +118,9 @@ status_dict = {
     cp_model.MODEL_INVALID: 'MODEL_INVALID',
     cp_model.UNKNOWN: 'UNKNOWN',
 }
+
 print(f'Solver status: {status_dict.get(status, status)}')
+print(f'Solver time: {elapsed_time:.3f} seconds')
 
 if status == cp_model.FEASIBLE or status == cp_model.OPTIMAL:
     for i in range(n):

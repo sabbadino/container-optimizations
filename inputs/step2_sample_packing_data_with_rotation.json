@@ -5,7 +5,7 @@
     {"id": 2, "size": [3, 3, 6], "rotation": "z"},
     {"id": 3, "size": [2, 5, 2], "rotation": "free"},
     {"id": 4, "size": [2, 2, 2], "rotation": "none"},
-    {"id": 5, "size": [2, 2, 4], "rotation": "free"},
+    {"id": 5, "size": [2, 2, 2], "rotation": "free"},
     {"id": 6, "size": [8, 1, 1], "rotation": "free"},
     {"id": 7, "size": [5, 5, 8], "rotation": "free"},
     {"id": 8, "size": [3, 3, 6], "rotation": "free"},
