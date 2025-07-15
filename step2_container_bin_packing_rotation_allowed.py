@@ -16,12 +16,16 @@ if len(sys.argv) < 2:
 
 
 input_file = sys.argv[1]
-container, boxes, symmetry_mode, max_time, anchormode, maximize_surface_contact_weight = load_data_from_json(input_file)
+container, boxes, symmetry_mode, max_time, anchormode, prefer_side_with_biggest_surface_at_the_bottom_weight, prefer_maximize_surface_contact_weight, prefer_large_base_lower_weight = load_data_from_json(input_file)
 print(f'symmetry_mode:  {symmetry_mode}')
 if anchormode:
     print(f'anchormode: {anchormode}')
-if maximize_surface_contact_weight:
-    print(f'maximizeBoxSurfaceContactAreaWeight: {maximize_surface_contact_weight}')
+if prefer_side_with_biggest_surface_at_the_bottom_weight:
+    print(f'prefer_side_with_biggest_surface_at_the_bottom_weight: {prefer_side_with_biggest_surface_at_the_bottom_weight}')
+if prefer_maximize_surface_contact_weight:
+    print(f'prefer_maximize_surface_contact_weight: {prefer_maximize_surface_contact_weight}')
+if prefer_large_base_lower_weight:
+    print(f'prefer_large_base_lower_weight: {prefer_large_base_lower_weight}')
 
 import time
 solver = cp_model.CpSolver()
@@ -123,21 +127,29 @@ add_inside_container_constraint(model, n, x, y, z, l_eff, w_eff, h_eff, containe
 
 
 
-from model_constraints import add_no_floating_constraint, get_total_floor_area_covered, get_preferred_orientation_vars_for_largest_bottom_face
+from model_constraints import add_no_floating_constraint, get_total_floor_area_covered, get_preferred_orientation_vars_for_largest_bottom_face, get_total_contact_area_on_bottom_surface, get_weighted_sum_base_area_times_height_from_bottom
 
 # Add no floating constraint
 on_floor_vars = add_no_floating_constraint(model, n, x, y, z, l_eff, w_eff, h_eff)
 # Maximize total covered floor area
 area_vars = get_total_floor_area_covered(model, n, on_floor_vars, l_eff, w_eff, container)
 
-# Soft constraint: prefer orientations with largest bottom face if enabled
+# Soft constraints
 alpha = 1.0  # main objective weight (total floor area)
-if maximize_surface_contact_weight:
+terms = [alpha * sum(area_vars)]
+if prefer_side_with_biggest_surface_at_the_bottom_weight:
     preferred_orient_vars = get_preferred_orientation_vars_for_largest_bottom_face(perms_list, orient, boxes)
-    beta = maximize_surface_contact_weight
-    model.Maximize(alpha * sum(area_vars) + beta * sum(preferred_orient_vars))
-else:
-    model.Maximize(alpha * sum(area_vars))
+    beta = prefer_side_with_biggest_surface_at_the_bottom_weight
+    terms.append(beta * sum(preferred_orient_vars))
+if prefer_maximize_surface_contact_weight:
+    contact_area_vars = get_total_contact_area_on_bottom_surface(model, n, x, y, z, l_eff, w_eff, h_eff)
+    gamma = prefer_maximize_surface_contact_weight
+    terms.append(gamma * sum(contact_area_vars))
+if prefer_large_base_lower_weight:
+    weighted_terms = get_weighted_sum_base_area_times_height_from_bottom(model, n, z, l_eff, w_eff, container)
+    delta = prefer_large_base_lower_weight
+    terms.append(delta * sum(weighted_terms))
+model.Maximize(sum(terms))
 
 
 # Solve

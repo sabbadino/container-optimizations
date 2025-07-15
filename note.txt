@@ -1,3 +1,12 @@
+preferSideWithBiggestSurfaceAtTheBottomWeight // prefer to place boxes that can be rotated to have the largest surface area at the bottom 
+preferMaximizeSurfaceContactWeight // prefer to maximize surface area of a box against the lower boxes (it seems very expensive )
+preferLargeBaseLowerWeight // prefer boxes with larger surface on the bottom  , that is, encourages boxes with larger lower surfaces to be placed lower in the container.
+
+
+
+--------------------
+unsorted
+
 sabbadino-ca: if i give differnt optimazation parameters (model.Maximize / model.Minimize)  , how do i control a balance of importance and prirority among them 
 
 GitHub Copilot: In OR-Tools CP-SAT, you can control the balance and priority among multiple objectives using two main approaches:
