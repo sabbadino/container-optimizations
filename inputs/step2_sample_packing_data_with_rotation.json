@@ -1,6 +1,7 @@
 {
   "symmetry_breaking": "simple",
   "max_time_in_seconds": 120,
+  "maximizeBoxSurfaceContactAreaWeight" : 0.1,  
   "anchormode": "heavierWithinMostRecurringSimilar",
   "container": [10, 10, 10],
   "boxes": [

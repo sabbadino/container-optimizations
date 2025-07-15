@@ -8,4 +8,5 @@ def load_data_from_json(input_file):
     symmetry_mode = data.get('symmetry_breaking', 'full')
     max_time = data.get('max_time_in_seconds', 60)
     anchormode = data.get('anchormode', None)
-    return container, boxes, symmetry_mode, max_time, anchormode
+    maximize_surface_contact_weight = data.get('maximizeBoxSurfaceContactAreaWeight', 0)
+    return container, boxes, symmetry_mode, max_time, anchormode, maximize_surface_contact_weight

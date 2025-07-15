@@ -16,10 +16,12 @@ if len(sys.argv) < 2:
 
 
 input_file = sys.argv[1]
-container, boxes, symmetry_mode, max_time, anchormode = load_data_from_json(input_file)
+container, boxes, symmetry_mode, max_time, anchormode, maximize_surface_contact_weight = load_data_from_json(input_file)
 print(f'symmetry_mode:  {symmetry_mode}')
 if anchormode:
     print(f'anchormode: {anchormode}')
+if maximize_surface_contact_weight:
+    print(f'maximizeBoxSurfaceContactAreaWeight: {maximize_surface_contact_weight}')
 
 import time
 solver = cp_model.CpSolver()
@@ -121,13 +123,21 @@ add_inside_container_constraint(model, n, x, y, z, l_eff, w_eff, h_eff, containe
 
 
 
-from model_constraints import add_no_floating_constraint, get_total_floor_area_covered
+from model_constraints import add_no_floating_constraint, get_total_floor_area_covered, get_preferred_orientation_vars_for_largest_bottom_face
 
 # Add no floating constraint
 on_floor_vars = add_no_floating_constraint(model, n, x, y, z, l_eff, w_eff, h_eff)
 # Maximize total covered floor area
 area_vars = get_total_floor_area_covered(model, n, on_floor_vars, l_eff, w_eff, container)
-model.Maximize(sum(area_vars))
+
+# Soft constraint: prefer orientations with largest bottom face if enabled
+alpha = 1.0  # main objective weight (total floor area)
+if maximize_surface_contact_weight:
+    preferred_orient_vars = get_preferred_orientation_vars_for_largest_bottom_face(perms_list, orient, boxes)
+    beta = maximize_surface_contact_weight
+    model.Maximize(alpha * sum(area_vars) + beta * sum(preferred_orient_vars))
+else:
+    model.Maximize(alpha * sum(area_vars))
 
 
 # Solve

@@ -116,3 +116,23 @@ def get_total_floor_area_covered(model, n, on_floor_vars, l_eff, w_eff, containe
         model.AddMultiplicationEquality(area_i, [on_floor_vars[i], tmp])
         area_vars.append(area_i)
     return area_vars
+
+
+def get_preferred_orientation_vars_for_largest_bottom_face(perms_list, orient, boxes):
+    """
+    Returns a list of orientation variables where the largest face is on the bottom for each box,
+    but only for boxes with free rotation.
+    perms_list: list of lists of (l, w, h) tuples for each box's allowed orientations.
+    orient: list of lists of BoolVar, orient[i][k] is 1 if box i uses orientation k.
+    boxes: list of box dicts (to check rotation type)
+    """
+    preferred_orient_vars = []
+    for i, perms in enumerate(perms_list):
+        if boxes[i].get('rotation', 'free') != 'free':
+            continue
+        bottom_areas = [l * w for (l, w, h) in perms]
+        max_area = max(bottom_areas)
+        for k, area in enumerate(bottom_areas):
+            if area == max_area:
+                preferred_orient_vars.append(orient[i][k])
+    return preferred_orient_vars
