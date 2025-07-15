@@ -1,4 +1,6 @@
 {
+  "symmetry_breaking": "simple",
+  "max_time_in_seconds": 60,
   "container": [10, 10, 10],
   "boxes": [
     {"id": 1, "size": [4, 4, 4], "rotation": "free"},

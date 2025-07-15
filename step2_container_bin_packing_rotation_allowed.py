@@ -12,8 +12,14 @@ if len(sys.argv) < 2:
     print("Usage: python container_bin_packing-1-geometry.py <input_json_file>")
     sys.exit(1)
 
+
+
 input_file = sys.argv[1]
-container, boxes = load_data_from_json(input_file)
+container, boxes, symmetry_mode, max_time = load_data_from_json(input_file)
+print(f'symmetry_mode:  {symmetry_mode}')
+
+import time
+solver = cp_model.CpSolver()
 
 # Early check: if total box volume > container volume, exit
 container_volume = container[0] * container[1] * container[2]
@@ -67,20 +73,11 @@ for i in range(n):
         model.Add(w_eff[i] == w).OnlyEnforceIf(orient[i][k])
         model.Add(h_eff[i] == h).OnlyEnforceIf(orient[i][k])
 
+
+
 # Symmetry breaking for identical boxes (same size and allowed rotations)
-for i in range(n):
-    for j in range(i + 1, n):
-        # Check if boxes i and j are identical in size and allowed rotations
-        if (
-            boxes[i]['size'] == boxes[j]['size']
-            and boxes[i].get('rotation', 'free') == boxes[j].get('rotation', 'free')
-        ):
-            # Enforce lexicographical order on (x, y, z) for i < j
-            model.Add(x[i] <= x[j])
-            # Optionally, for stricter symmetry breaking, use y and z as tie-breakers
-            # model.Add(x[i] < x[j]).OnlyEnforceIf(model.NewBoolVar(f'sb_x_{i}_{j}'))
-            # model.Add(y[i] <= y[j]).OnlyEnforceIf(x[i] == x[j])
-            # model.Add(z[i] <= z[j]).OnlyEnforceIf((x[i] == x[j]) & (y[i] == y[j]))
+from model_constraints import add_symmetry_breaking_for_identical_boxes
+add_symmetry_breaking_for_identical_boxes(model, boxes, x, y, z, symmetry_mode)
 
 
 from model_constraints import add_no_overlap_constraint
@@ -103,9 +100,9 @@ model.Maximize(sum(area_vars))
 
 
 # Solve
-import time
-solver = cp_model.CpSolver()
-solver.parameters.max_time_in_seconds = 30
+
+solver.parameters.max_time_in_seconds = max_time
+print(f'Solver max_time_in_seconds: {max_time}')
 start_time = time.time()
 status = solver.Solve(model)
 elapsed_time = time.time() - start_time

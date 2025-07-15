@@ -1,3 +1,48 @@
+def add_symmetry_breaking_for_identical_boxes(model, boxes, x, y, z, symmetry_mode):
+    """
+    Adds symmetry breaking constraints for identical boxes (same size and allowed rotations).
+    symmetry_mode: 'simple' or 'full'.
+    """
+    n = len(boxes)
+    for i in range(n):
+        for j in range(i + 1, n):
+            if (
+                boxes[i]['size'] == boxes[j]['size']
+                and boxes[i].get('rotation', 'free') == boxes[j].get('rotation', 'free')
+            ):
+                if symmetry_mode == 'simple':
+                    # Simple: x[i] <= x[j]
+                    model.Add(x[i] <= x[j])
+                else:
+                    # Full lexicographical ordering
+                    b_xless = model.NewBoolVar(f'sb_xless_{i}_{j}')
+                    b_xeq = model.NewBoolVar(f'sb_xeq_{i}_{j}')
+                    b_yless = model.NewBoolVar(f'sb_yless_{i}_{j}')
+                    b_yeq = model.NewBoolVar(f'sb_yeq_{i}_{j}')
+                    # x[i] < x[j] <=> b_xless
+                    model.Add(x[i] < x[j]).OnlyEnforceIf(b_xless)
+                    model.Add(x[i] >= x[j]).OnlyEnforceIf(b_xless.Not())
+                    # x[i] == x[j] <=> b_xeq
+                    model.Add(x[i] == x[j]).OnlyEnforceIf(b_xeq)
+                    model.Add(x[i] != x[j]).OnlyEnforceIf(b_xeq.Not())
+                    # y[i] < y[j] <=> b_yless
+                    model.Add(y[i] < y[j]).OnlyEnforceIf(b_yless)
+                    model.Add(y[i] >= y[j]).OnlyEnforceIf(b_yless.Not())
+                    # y[i] == y[j] <=> b_yeq
+                    model.Add(y[i] == y[j]).OnlyEnforceIf(b_yeq)
+                    model.Add(y[i] != y[j]).OnlyEnforceIf(b_yeq.Not())
+                    # b_xy_eq = b_xeq AND b_yeq
+                    b_xy_eq = model.NewBoolVar(f'sb_xyeq_{i}_{j}')
+                    model.AddBoolAnd([b_xeq, b_yeq]).OnlyEnforceIf(b_xy_eq)
+                    model.AddBoolOr([b_xeq.Not(), b_yeq.Not()]).OnlyEnforceIf(b_xy_eq.Not())
+                    # z[i] <= z[j] if b_xy_eq
+                    model.Add(z[i] <= z[j]).OnlyEnforceIf(b_xy_eq)
+                    # Main lex constraint:
+                    # (x[i] < x[j]) OR (x[i] == x[j] AND y[i] < y[j]) OR (x[i] == x[j] AND y[i] == y[j] AND z[i] <= z[j])
+                    b_xeq_and_yless = model.NewBoolVar(f'sb_xeq_yless_{i}_{j}')
+                    model.AddBoolAnd([b_xeq, b_yless]).OnlyEnforceIf(b_xeq_and_yless)
+                    model.AddBoolOr([b_xeq.Not(), b_yless.Not()]).OnlyEnforceIf(b_xeq_and_yless.Not())
+                    model.AddBoolOr([b_xless, b_xeq_and_yless, b_xy_eq])
 def add_no_overlap_constraint(model, n, x, y, z, l_eff, w_eff, h_eff):
     """
     Adds no-overlap constraints for all pairs of boxes in 3D using effective dimensions.
