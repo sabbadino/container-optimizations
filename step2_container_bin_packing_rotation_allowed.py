@@ -14,9 +14,12 @@ if len(sys.argv) < 2:
 
 
 
+
 input_file = sys.argv[1]
-container, boxes, symmetry_mode, max_time = load_data_from_json(input_file)
+container, boxes, symmetry_mode, max_time, anchormode = load_data_from_json(input_file)
 print(f'symmetry_mode:  {symmetry_mode}')
+if anchormode:
+    print(f'anchormode: {anchormode}')
 
 import time
 solver = cp_model.CpSolver()
@@ -66,6 +69,7 @@ w_eff = [model.NewIntVar(0, container[1], f'w_eff_{i}') for i in range(n)]
 h_eff = [model.NewIntVar(0, container[2], f'h_eff_{i}') for i in range(n)]
 
 
+
 # Link orientation to effective dimensions
 for i in range(n):
     for k, (l, w, h) in enumerate(perms_list[i]):
@@ -74,10 +78,37 @@ for i in range(n):
         model.Add(h_eff[i] == h).OnlyEnforceIf(orient[i][k])
 
 
+# Anchor logic based on anchormode
+if anchormode is not None:
+    if anchormode == 'larger':
+        largest_idx = max(range(n), key=lambda i: boxes[i]['size'][0] * boxes[i]['size'][1] * boxes[i]['size'][2])
+        model.Add(x[largest_idx] == 0)
+        model.Add(y[largest_idx] == 0)
+        model.Add(z[largest_idx] == 0)
+        print(f'Anchoring box {largest_idx} (id={boxes[largest_idx].get("id", largest_idx+1)}) at the origin as the largest box by volume (size={boxes[largest_idx]["size"]})')
+    elif anchormode == 'heavierWithinMostRecurringSimilar':
+        # Find the most frequent box size
+        from collections import Counter
+        size_tuples = [tuple(box['size']) for box in boxes]
+        freq = Counter(size_tuples)
+        most_common_size, _ = freq.most_common(1)[0]
+        # Find all indices with this size
+        indices = [i for i, box in enumerate(boxes) if tuple(box['size']) == most_common_size]
+        # Among them, pick the heaviest one
+        heaviest_idx = max(indices, key=lambda i: boxes[i].get('weight', 0))
+        model.Add(x[heaviest_idx] == 0)
+        model.Add(y[heaviest_idx] == 0)
+        model.Add(z[heaviest_idx] == 0)
+        print(f"Anchoring box {heaviest_idx} (id={boxes[heaviest_idx].get('id', heaviest_idx+1)}) at the origin as the heaviest box within the most recurring size group (size={boxes[heaviest_idx]['size']}, count={len(indices)}, weight={boxes[heaviest_idx].get('weight')})")
+    else:
+        print(f"Error: Unknown anchormode '{anchormode}'. Supported: 'larger', 'heavierWithinMostRecurringSimilar'. Exiting.")
+        sys.exit(1)
+
+
 
 # Symmetry breaking for identical boxes (same size and allowed rotations)
 from model_constraints import add_symmetry_breaking_for_identical_boxes
-add_symmetry_breaking_for_identical_boxes(model, boxes, x, y, z, symmetry_mode)
+add_symmetry_breaking_for_identical_boxes(model, boxes, x, y, z, symmetry_mode, container)
 
 
 from model_constraints import add_no_overlap_constraint
@@ -125,7 +156,7 @@ if status == cp_model.FEASIBLE or status == cp_model.OPTIMAL:
         orient_val = [solver.Value(orient[i][k]) for k in range(len(orient[i]))]
         orient_idx = orient_val.index(1)
         l, w, h = perms_list[i][orient_idx]
-        print(f'Box {i}: pos=({solver.Value(x[i])}, {solver.Value(y[i])}, {solver.Value(z[i])}), size=({l}, {w}, {h}), orientation={orient_idx}, rotation_type={boxes[i].get("rotation", "free")}')
+        print(f'BoxId {boxes[i].get("id")}: pos=({solver.Value(x[i])}, {solver.Value(y[i])}, {solver.Value(z[i])}), size=({l}, {w}, {h}), orientation={orient_idx}, rotation_type={boxes[i].get("rotation", "free")}')
 
     from visualization_utils import visualize_solution
     visualize_solution(container, boxes, perms_list, orient, x, y, z, solver, n)

@@ -1,9 +1,14 @@
-def add_symmetry_breaking_for_identical_boxes(model, boxes, x, y, z, symmetry_mode):
+def add_symmetry_breaking_for_identical_boxes(model, boxes, x, y, z, symmetry_mode, container):
     """
     Adds symmetry breaking constraints for identical boxes (same size and allowed rotations).
     symmetry_mode: 'simple' or 'full'.
+    For 'simple', chooses the axis with the largest container dimension.
     """
     n = len(boxes)
+    # Determine axis with largest container dimension
+    axis_names = ['x', 'y', 'z']
+    axis_vars = [x, y, z]
+    max_axis = max(enumerate(container), key=lambda t: t[1])[0]  # 0=x, 1=y, 2=z
     for i in range(n):
         for j in range(i + 1, n):
             if (
@@ -11,8 +16,8 @@ def add_symmetry_breaking_for_identical_boxes(model, boxes, x, y, z, symmetry_mo
                 and boxes[i].get('rotation', 'free') == boxes[j].get('rotation', 'free')
             ):
                 if symmetry_mode == 'simple':
-                    # Simple: x[i] <= x[j]
-                    model.Add(x[i] <= x[j])
+                    # Use the axis with the largest container dimension
+                    model.Add(axis_vars[max_axis][i] <= axis_vars[max_axis][j])
                 else:
                     # Full lexicographical ordering
                     b_xless = model.NewBoolVar(f'sb_xless_{i}_{j}')
