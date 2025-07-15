@@ -98,9 +98,9 @@ group_in_containers = {}  # group_in_containers[g] = number of containers group 
 for g in group_ids:
     for j in range(max_containers):
         group_in_j[g, j] = model.NewBoolVar(f'group_{g}_in_{j}')
-        # group_in_j[g, j] >= x[i, j] for any i in group g
-        for i in group_to_items[g]:
-            model.AddImplication(x[i, j], group_in_j[g, j])
+        # group_in_j[g, j] is true iff any item of group g is placed in container j
+        item_vars = [x[i, j] for i in group_to_items[g]]
+        model.AddMaxEquality(group_in_j[g, j], item_vars)
     # group_in_containers[g] = sum_j group_in_j[g, j]
     group_in_containers[g] = model.NewIntVar(1, max_containers, f'group_{g}_num_containers')
     model.Add(group_in_containers[g] == sum(group_in_j[g, j] for j in range(max_containers)))
