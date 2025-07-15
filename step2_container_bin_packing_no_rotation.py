@@ -5,9 +5,9 @@ import sys
 import json
 from ortools.sat.python import cp_model
 
-# Usage: python container_bin_packing-1-geometry.py <input_json_file>
+# Usage: python step2_container_bin_packing_no_rotation.py <input_json_file>
 if len(sys.argv) < 2:
-    print("Usage: python container_bin_packing-1-geometry.py <input_json_file>")
+    print("Usage: python step2_container_bin_packing_no_rotation.py <input_json_file>")
     sys.exit(1)
 
 input_file = sys.argv[1]
