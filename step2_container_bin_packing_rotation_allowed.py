@@ -3,6 +3,7 @@
 
 
 
+
 import sys
 from ortools.sat.python import cp_model
 from load_utils import load_data_from_json
@@ -15,109 +16,36 @@ if len(sys.argv) < 2:
 
 
 
-input_file = sys.argv[1]
-container, boxes, symmetry_mode, max_time, anchormode, prefer_side_with_biggest_surface_at_the_bottom_weight, prefer_maximize_surface_contact_weight, prefer_large_base_lower_weight = load_data_from_json(input_file)
-print(f'symmetry_mode:  {symmetry_mode}')
-if anchormode:
-    print(f'anchormode: {anchormode}')
-if prefer_side_with_biggest_surface_at_the_bottom_weight:
-    print(f'prefer_side_with_biggest_surface_at_the_bottom_weight: {prefer_side_with_biggest_surface_at_the_bottom_weight}')
-if prefer_maximize_surface_contact_weight:
-    print(f'prefer_maximize_surface_contact_weight: {prefer_maximize_surface_contact_weight}')
-if prefer_large_base_lower_weight:
-    print(f'prefer_large_base_lower_weight: {prefer_large_base_lower_weight}')
 
+input_file = sys.argv[1]
+container, boxes, symmetry_mode, max_time, anchormode, \
+    prefer_side_with_biggest_surface_at_the_bottom_weight, \
+    prefer_maximize_surface_contact_weight, \
+    prefer_put_boxes_lower_z_weight, \
+    prefer_total_floor_area_weight, \
+    prefer_put_boxes_lower_z_non_linear_weight = load_data_from_json(input_file)
+print(f'symmetry_mode:  {symmetry_mode}')
+print(f'anchormode: {anchormode}')
+print(f'prefer_side_with_biggest_surface_at_the_bottom_weight: {prefer_side_with_biggest_surface_at_the_bottom_weight}')
+print(f'prefer_maximize_surface_contact_weight: {prefer_maximize_surface_contact_weight}')
+print(f'prefer_large_base_lower_weight: {prefer_put_boxes_lower_z_weight}')
+print(f'prefer_total_floor_area_weight: {prefer_total_floor_area_weight}')
+print(f'prefer_large_base_lower_non_linear_weight: {prefer_put_boxes_lower_z_non_linear_weight}')
+
+model = cp_model.CpModel()
+from model_setup import setup_3d_bin_packing_model
+n, x, y, z, perms_list, orient, l_eff, w_eff, h_eff = setup_3d_bin_packing_model(model, container, boxes)
 import time
 solver = cp_model.CpSolver()
 
-# Early check: if total box volume > container volume, exit
-container_volume = container[0] * container[1] * container[2]
-total_box_volume = sum(box['size'][0] * box['size'][1] * box['size'][2] for box in boxes)
-if total_box_volume > container_volume:
-    print(f"No solution: total box volume ({total_box_volume}) exceeds container volume ({container_volume}).")
-    sys.exit(0)
-
-
-model = cp_model.CpModel()
-n = len(boxes)
-
-
-# Variables: position of each box (lower-left-bottom corner)
-x = [model.NewIntVar(0, container[0], f'x_{i}') for i in range(n)]
-y = [model.NewIntVar(0, container[1], f'y_{i}') for i in range(n)]
-z = [model.NewIntVar(0, container[2], f'z_{i}') for i in range(n)]
-
-
-# For each box, determine allowed orientations and create orientation variables
-perms_list = []
-orient = []
-for i, box in enumerate(boxes):
-    l0, w0, h0 = box['size']
-    rot = box.get('rotation', 'free')
-    if rot == 'free':
-        perms = [
-            (l0, w0, h0), (l0, h0, w0), (w0, l0, h0),
-            (w0, h0, l0), (h0, l0, w0), (h0, w0, l0)
-        ]
-    elif rot == 'z':
-        perms = [
-            (l0, w0, h0), (w0, l0, h0)
-        ]
-    else:  # 'none' or unspecified
-        perms = [(l0, w0, h0)]
-    perms_list.append(perms)
-    orient.append([model.NewBoolVar(f'orient_{i}_{k}') for k in range(len(perms))])
-    model.Add(sum(orient[-1]) == 1)
-
-# Effective dimensions for each box
-l_eff = [model.NewIntVar(0, container[0], f'l_eff_{i}') for i in range(n)]
-w_eff = [model.NewIntVar(0, container[1], f'w_eff_{i}') for i in range(n)]
-h_eff = [model.NewIntVar(0, container[2], f'h_eff_{i}') for i in range(n)]
 
 
 
-# Link orientation to effective dimensions
-for i in range(n):
-    for k, (l, w, h) in enumerate(perms_list[i]):
-        model.Add(l_eff[i] == l).OnlyEnforceIf(orient[i][k])
-        model.Add(w_eff[i] == w).OnlyEnforceIf(orient[i][k])
-        model.Add(h_eff[i] == h).OnlyEnforceIf(orient[i][k])
 
+from model_constraints import add_no_overlap_constraint, apply_anchor_logic
+ # Anchor logic based on anchormode
+apply_anchor_logic(model, anchormode, boxes, x, y, z)
 
-# Anchor logic based on anchormode
-if anchormode is not None:
-    if anchormode == 'larger':
-        largest_idx = max(range(n), key=lambda i: boxes[i]['size'][0] * boxes[i]['size'][1] * boxes[i]['size'][2])
-        model.Add(x[largest_idx] == 0)
-        model.Add(y[largest_idx] == 0)
-        model.Add(z[largest_idx] == 0)
-        print(f'Anchoring box {largest_idx} (id={boxes[largest_idx].get("id", largest_idx+1)}) at the origin as the largest box by volume (size={boxes[largest_idx]["size"]})')
-    elif anchormode == 'heavierWithinMostRecurringSimilar':
-        # Find the most frequent box size
-        from collections import Counter
-        size_tuples = [tuple(box['size']) for box in boxes]
-        freq = Counter(size_tuples)
-        most_common_size, _ = freq.most_common(1)[0]
-        # Find all indices with this size
-        indices = [i for i, box in enumerate(boxes) if tuple(box['size']) == most_common_size]
-        # Among them, pick the heaviest one
-        heaviest_idx = max(indices, key=lambda i: boxes[i].get('weight', 0))
-        model.Add(x[heaviest_idx] == 0)
-        model.Add(y[heaviest_idx] == 0)
-        model.Add(z[heaviest_idx] == 0)
-        print(f"Anchoring box {heaviest_idx} (id={boxes[heaviest_idx].get('id', heaviest_idx+1)}) at the origin as the heaviest box within the most recurring size group (size={boxes[heaviest_idx]['size']}, count={len(indices)}, weight={boxes[heaviest_idx].get('weight')})")
-    else:
-        print(f"Error: Unknown anchormode '{anchormode}'. Supported: 'larger', 'heavierWithinMostRecurringSimilar'. Exiting.")
-        sys.exit(1)
-
-
-
-# Symmetry breaking for identical boxes (same size and allowed rotations)
-from model_constraints import add_symmetry_breaking_for_identical_boxes
-add_symmetry_breaking_for_identical_boxes(model, boxes, x, y, z, symmetry_mode, container)
-
-
-from model_constraints import add_no_overlap_constraint
 add_no_overlap_constraint(model, n, x, y, z, l_eff, w_eff, h_eff)
 
 
@@ -127,28 +55,38 @@ add_inside_container_constraint(model, n, x, y, z, l_eff, w_eff, h_eff, containe
 
 
 
-from model_constraints import add_no_floating_constraint, get_total_floor_area_covered, get_preferred_orientation_vars_for_largest_bottom_face, get_total_contact_area_on_bottom_surface, get_weighted_sum_base_area_times_height_from_bottom
+from model_optimizations import add_symmetry_breaking_for_identical_boxes,prefer_put_boxes_lower_z_non_linear, get_total_floor_area_covered, prefer_side_with_biggest_surface_at_the_bottom, prefer_maximize_surface_contact, prefer_put_boxes_lower_z
+
+# Symmetry breaking for identical boxes (same size and allowed rotations)
+add_symmetry_breaking_for_identical_boxes(model, boxes, x, y, z, symmetry_mode, container)
 
 # Add no floating constraint
+from model_constraints import add_no_floating_constraint
 on_floor_vars = add_no_floating_constraint(model, n, x, y, z, l_eff, w_eff, h_eff)
-# Maximize total covered floor area
-area_vars = get_total_floor_area_covered(model, n, on_floor_vars, l_eff, w_eff, container)
+
 
 # Soft constraints
-alpha = 1.0  # main objective weight (total floor area)
-terms = [alpha * sum(area_vars)]
+terms = []
+if prefer_total_floor_area_weight:
+    # Maximize total covered floor area (as a soft constraint with weight)
+    area_vars = get_total_floor_area_covered(model, n, on_floor_vars, l_eff, w_eff, container)
+    terms.append(prefer_total_floor_area_weight * sum(area_vars))
 if prefer_side_with_biggest_surface_at_the_bottom_weight:
-    preferred_orient_vars = get_preferred_orientation_vars_for_largest_bottom_face(perms_list, orient, boxes)
+    preferred_orient_vars = prefer_side_with_biggest_surface_at_the_bottom(perms_list, orient, boxes)
     beta = prefer_side_with_biggest_surface_at_the_bottom_weight
     terms.append(beta * sum(preferred_orient_vars))
 if prefer_maximize_surface_contact_weight:
-    contact_area_vars = get_total_contact_area_on_bottom_surface(model, n, x, y, z, l_eff, w_eff, h_eff)
+    contact_area_vars = prefer_maximize_surface_contact(model, n, x, y, z, l_eff, w_eff, h_eff,container)
     gamma = prefer_maximize_surface_contact_weight
     terms.append(gamma * sum(contact_area_vars))
-if prefer_large_base_lower_weight:
-    weighted_terms = get_weighted_sum_base_area_times_height_from_bottom(model, n, z, l_eff, w_eff, container)
-    delta = prefer_large_base_lower_weight
+if prefer_put_boxes_lower_z_weight:
+    weighted_terms = prefer_put_boxes_lower_z(model, n, z, l_eff, w_eff, container)
+    delta = prefer_put_boxes_lower_z_weight
     terms.append(delta * sum(weighted_terms))
+if prefer_put_boxes_lower_z_non_linear_weight:
+    weighted_terms_nl = prefer_put_boxes_lower_z_non_linear(model, n, z, l_eff, w_eff, container)
+    delta_nl = prefer_put_boxes_lower_z_non_linear_weight
+    terms.append(delta_nl * sum(weighted_terms_nl))
 model.Maximize(sum(terms))
 
 

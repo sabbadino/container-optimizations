@@ -3,7 +3,11 @@
   "max_time_in_seconds": 120,
   "preferSideWithBiggestSurfaceAtTheBottomWeight": 0.1, 
   "preferMaximizeSurfaceContactWeight": 0,
+
+  "preferLargeBaseLowerNonLinearWeight": 1,
   "preferLargeBaseLowerWeight": 0.1,
+  
+  "preferTotalFloorAreaWeight": 0,
   "anchormode": "heavierWithinMostRecurringSimilar",
   "container": [10, 10, 10],
   "boxes": [
