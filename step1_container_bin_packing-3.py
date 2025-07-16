@@ -6,20 +6,24 @@ import datetime
 from ortools.sat.python import cp_model
 
 # Get input filename from command line
-if len(sys.argv) < 2:
-    print('Usage: python container_bin_packing.py <input_json_file>')
+if len(sys.argv) < 3:
+    print('Usage: python container_bin_packing.py <input_json_file> <output_json_file>')
     sys.exit(1)
 input_filename = sys.argv[1]
-
+ouput_filename = sys.argv[2]
 # Read input data from JSON file
+
 with open(input_filename, 'r') as f:
     data = json.load(f)
 
+# Read rotation property (default to 'free' if not present)
+rotation = data.get('rotation', 'free')
 
-container_volume = data['container']['volume']
+
+container_volume = data['container']['size'][0] * data['container']['size'][1] * data['container']['size'][2]   
 container_weight = data['container']['weight']
 item_ids = [item.get('id', i+1) for i, item in enumerate(data['items'])]
-item_volumes = [item['volume'] for item in data['items']]
+item_volumes = [item['size'][0] * item['size'][1] * item['size'][2] for item in data['items']]
 item_weights = [item['weight'] for item in data['items']]
 item_group_ids = [item.get('group_id') for item in data['items']]
 num_items = len(data['items'])
@@ -31,6 +35,7 @@ input_md = []
 input_md.append('## INPUTS')
 input_md.append(f'- Container volume capacity: {container_volume}')
 input_md.append(f'- Container weight capacity: {container_weight}')
+input_md.append(f'- Rotation: {rotation}')
 input_md.append(f'- Items:')
 input_md.append('')
 input_md.append('| id | weight | volume | group_id |')
@@ -44,6 +49,7 @@ print(f'****************')
 print(f'INPUTS')
 print(f'Container volume capacity: {container_volume}')
 print(f'Container weight capacity: {container_weight}')
+print(f'Rotation: {rotation}')
 print('Item details:')
 for i in range(num_items):
     print(f'  Item {item_ids[i]}: weight={item_weights[i]}, volume={item_volumes[i]}, group_id={item_group_ids[i]}')
@@ -188,4 +194,46 @@ with open(md_filename, 'w', encoding='utf-8') as f:
     f.write('\n'.join(input_md))
     f.write('\n---\n')
     f.write('\n'.join(output_md))
-print(f'\nResults also written to {md_filename}')
+
+# --- Write JSON output file ---
+output_json = {}
+output_json["containers"] = []
+
+if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+    # Use the same container size for all containers (from input, if available)
+    container_size = data['container'].get('size', None)
+    # If not present, try to infer from volume (cube root), else use None
+    if container_size is None:
+        raise ValueError("Container size must be specified in input data.")
+    # If container size is not provided, we cannot proceed
+    # For each used container, build the output structure
+    for old_j in used_container_indices:
+        new_j = container_rebase[old_j]
+        items_in_container = [i for i in range(num_items) if solver.Value(x[i, old_j])]
+        container_entry = {
+            "id": new_j,
+            "size": container_size,
+            "boxes": []
+        }
+        for i in items_in_container:
+            # Try to get size and rotation from input, fallback to None/defaults
+            box_size = data['items'][i].get('size', None)
+            if box_size is None:
+                raise ValueError("Box size must be specified in input data.")
+            box_rotation = data['items'][i].get('rotation', rotation)
+            box_entry = {
+                "id": item_ids[i],
+                "size": box_size,
+                "rotation": box_rotation,
+                "weight": item_weights[i]
+            }
+            container_entry["boxes"].append(box_entry)
+        output_json["containers"].append(container_entry)
+
+# Write JSON file
+
+with open(ouput_filename, 'w', encoding='utf-8') as fjson:
+    import json as _json
+    _json.dump(output_json, fjson, indent=2)
+print(f'JSON results also written to {ouput_filename}')
+

@@ -20,6 +20,16 @@
                 "inputs/step2_sample_packing_data_with_rotation.json"
             ],
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug Bin Packing (step1)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/step1_container_bin_packing-3.py",
+            "args": [
+                "inputs/step1_input_data_50_to_split.json"
+            ],
+            "console": "integratedTerminal"
         }
     ]
 }

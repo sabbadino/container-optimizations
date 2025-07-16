@@ -1,0 +1,344 @@
+{
+  "containers": [
+    {
+      "id": 1,
+      "size": [
+        10,
+        10,
+        10
+      ],
+      "boxes": [
+        {
+          "id": 16,
+          "size": null,
+          "rotation": "free",
+          "weight": 3
+        },
+        {
+          "id": 17,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 18,
+          "size": null,
+          "rotation": "free",
+          "weight": 3
+        },
+        {
+          "id": 19,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 20,
+          "size": null,
+          "rotation": "free",
+          "weight": 3
+        },
+        {
+          "id": 21,
+          "size": null,
+          "rotation": "free",
+          "weight": 2
+        },
+        {
+          "id": 22,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 23,
+          "size": null,
+          "rotation": "free",
+          "weight": 2
+        },
+        {
+          "id": 24,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 25,
+          "size": null,
+          "rotation": "free",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "size": [
+        10,
+        10,
+        10
+      ],
+      "boxes": [
+        {
+          "id": 1,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 11,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 12,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 13,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 14,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 15,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 30,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 34,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 36,
+          "size": null,
+          "rotation": "free",
+          "weight": 2
+        },
+        {
+          "id": 38,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 40,
+          "size": null,
+          "rotation": "free",
+          "weight": 2
+        },
+        {
+          "id": 42,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 44,
+          "size": null,
+          "rotation": "free",
+          "weight": 2
+        },
+        {
+          "id": 46,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 48,
+          "size": null,
+          "rotation": "free",
+          "weight": 2
+        },
+        {
+          "id": 50,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "size": [
+        10,
+        10,
+        10
+      ],
+      "boxes": [
+        {
+          "id": 2,
+          "size": null,
+          "rotation": "free",
+          "weight": 2
+        },
+        {
+          "id": 3,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 4,
+          "size": null,
+          "rotation": "free",
+          "weight": 2
+        },
+        {
+          "id": 5,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 26,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 28,
+          "size": null,
+          "rotation": "free",
+          "weight": 2
+        },
+        {
+          "id": 32,
+          "size": null,
+          "rotation": "free",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "size": [
+        10,
+        10,
+        10
+      ],
+      "boxes": [
+        {
+          "id": 6,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 7,
+          "size": null,
+          "rotation": "free",
+          "weight": 2
+        },
+        {
+          "id": 8,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 9,
+          "size": null,
+          "rotation": "free",
+          "weight": 2
+        },
+        {
+          "id": 10,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 27,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 29,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 31,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 33,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 35,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 37,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 39,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 41,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 43,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 45,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 47,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        },
+        {
+          "id": 49,
+          "size": null,
+          "rotation": "free",
+          "weight": 1
+        }
+      ]
+    }
+  ]
+}
