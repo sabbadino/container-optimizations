@@ -182,7 +182,7 @@ else:
 
 # Write markdown file
 now = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-md_filename = f'container_bin_packing_result_{now}.md'
+md_filename = f'outputs/container_bin_packing_result_{now}.md'
 with open(md_filename, 'w', encoding='utf-8') as f:
     f.write('# Container Bin Packing Result\n\n')
     f.write('\n'.join(input_md))

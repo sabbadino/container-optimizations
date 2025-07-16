@@ -1,3 +1,46 @@
+def get_weighted_sum_base_area_times_height_from_bottom_ex(model, n, z, l_eff, w_eff, container):
+    """
+    Returns a list of terms, one for each box, representing (base area) * (height from bottom)^2,
+    where base area is the area of the lower face of the box in its current orientation, and
+    height from bottom is the distance from the bottom of the container to the lower face of the box.
+
+    This is a non-linear (quadratic) version: it strongly rewards placing large-base boxes lower in the container.
+    For boxes with free rotation, the base area is determined by the chosen orientation (l_eff[i], w_eff[i]).
+
+    Args:
+        model: The CpModel instance.
+        n: Number of boxes.
+        z: List of IntVar, z[i] is the z-coordinate of the lower face of box i.
+        l_eff, w_eff: Lists of IntVar, effective length and width of box i (depends on orientation).
+        container: Tuple/list of container dimensions (length, width, height).
+
+    Returns:
+        weighted_terms: List of IntVar, each representing (l_eff[i] * w_eff[i]) * (container[2] - z[i]) ** 2
+    """
+    weighted_terms = []
+    max_base_area = container[0] * container[1]
+    max_height = container[2]
+    for i in range(n):
+        # Compute the base area of the box in its current orientation
+        base_area = model.NewIntVar(0, max_base_area, f'base_area_{i}_ex')
+        model.AddMultiplicationEquality(base_area, [l_eff[i], w_eff[i]])
+
+        # Compute the height from the bottom of the container to the lower face of the box
+        height_from_bottom = model.NewIntVar(0, max_height, f'height_from_bottom_{i}_ex')
+        model.Add(height_from_bottom == max_height - z[i])
+
+        # Quadratic term: (height_from_bottom)^2
+        height_from_bottom_sq = model.NewIntVar(0, max_height * max_height, f'height_from_bottom_sq_{i}_ex')
+        model.AddMultiplicationEquality(height_from_bottom_sq, [height_from_bottom, height_from_bottom])
+
+        # The weighted term is base_area * (height_from_bottom)^2
+        weighted = model.NewIntVar(0, max_base_area * max_height * max_height, f'weighted_{i}_ex')
+        model.AddMultiplicationEquality(weighted, [base_area, height_from_bottom_sq])
+
+        # Add to the list of terms
+        weighted_terms.append(weighted)
+    return weighted_terms
+
 def get_weighted_sum_base_area_times_height_from_bottom(model, n, z, l_eff, w_eff, container):
     """
     Returns a list of terms, one for each box, representing (base area) * (height from bottom),
