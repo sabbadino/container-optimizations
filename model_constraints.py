@@ -144,6 +144,7 @@ def apply_anchor_logic(
     if anchormode is not None:
         if anchormode == 'larger':
             largest_idx: int = max(range(n), key=lambda i: boxes[i]['size'][0] * boxes[i]['size'][1] * boxes[i]['size'][2])
+            print(f"Anchoring box {largest_idx} with size {boxes[largest_idx]['size']}")
             model.Add(x[largest_idx] == 0)
             model.Add(y[largest_idx] == 0)
             model.Add(z[largest_idx] == 0)
@@ -154,9 +155,9 @@ def apply_anchor_logic(
             most_common_size, _ = freq.most_common(1)[0]
             indices: List[int] = [i for i, box in enumerate(boxes) if tuple(box['size']) == most_common_size]
             heaviest_idx: int = max(indices, key=lambda i: boxes[i].get('weight', 0))
+            print(f"Anchoring box {heaviest_idx} with size {boxes[heaviest_idx]['size']} and weight {boxes[heaviest_idx].get('weight', 0)}")
             model.Add(x[heaviest_idx] == 0)
             model.Add(y[heaviest_idx] == 0)
             model.Add(z[heaviest_idx] == 0)
         else:
-            print(f"Error: Unknown anchormode '{anchormode}'. Supported: 'larger', 'heavierWithinMostRecurringSimilar'. Exiting.")
-            sys.exit(1)
+            raise ValueError(f"Error: Unknown anchormode '{anchormode}'. Supported: 'larger', 'heavierWithinMostRecurringSimilar'. Exiting.")

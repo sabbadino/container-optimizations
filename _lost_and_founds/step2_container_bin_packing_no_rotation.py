@@ -96,7 +96,6 @@ status_dict = {
     cp_model.MODEL_INVALID: 'MODEL_INVALID',
     cp_model.UNKNOWN: 'UNKNOWN',
 }
-print(f'Solver status: {status_dict.get(status, status)}')
 
 if status == cp_model.FEASIBLE or status == cp_model.OPTIMAL:
     for i in range(n):

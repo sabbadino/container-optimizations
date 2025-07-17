@@ -1,4 +1,4 @@
-def visualize_solution(container, boxes, perms_list, orient, x, y, z, solver, n):
+def visualize_solution(container, boxes, perms_list, orient, x, y, z, solver, n, status_str=None, container_id=None):
     try:
         import matplotlib.pyplot as plt
         from mpl_toolkits.mplot3d.art3d import Poly3DCollection
@@ -99,7 +99,12 @@ def visualize_solution(container, boxes, perms_list, orient, x, y, z, solver, n)
     ax.set_ylim(0, cy)
     ax.set_zlim(0, cz)
     ax.set_box_aspect([cx, cy, cz])
-    plt.title('3D Container Packing Solution')
+    title = '3D Container Packing Solution'
+    if container_id is not None:
+        title += f' (Container Id: {container_id})'
+    if status_str:
+        title += f'\nSolver status: {status_str}'
+    plt.title(title)
 
     from matplotlib.lines import Line2D
     legend_elements = [
@@ -109,4 +114,4 @@ def visualize_solution(container, boxes, perms_list, orient, x, y, z, solver, n)
     ]
     ax.legend(handles=legend_elements, loc='upper right')
 
-    plt.show()
+    return plt

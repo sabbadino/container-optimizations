@@ -153,10 +153,10 @@ def add_symmetry_breaking_for_identical_boxes(model, boxes, x, y, z, symmetry_mo
                 if symmetry_mode == 'simple':
                     model.Add(axis_vars[max_axis][i] <= axis_vars[max_axis][j])
                 else:
-                    b_xless: BoolVar = model.NewBoolVar(f'sb_xless_{i}_{j}')
-                    b_xeq: BoolVar = model.NewBoolVar(f'sb_xeq_{i}_{j}')
-                    b_yless: BoolVar = model.NewBoolVar(f'sb_yless_{i}_{j}')
-                    b_yeq: BoolVar = model.NewBoolVar(f'sb_yeq_{i}_{j}')
+                    b_xless: BoolVarT = model.NewBoolVar(f'sb_xless_{i}_{j}')
+                    b_xeq: BoolVarT = model.NewBoolVar(f'sb_xeq_{i}_{j}')
+                    b_yless: BoolVarT = model.NewBoolVar(f'sb_yless_{i}_{j}')
+                    b_yeq: BoolVarT = model.NewBoolVar(f'sb_yeq_{i}_{j}')
                     model.Add(x[i] < x[j]).OnlyEnforceIf(b_xless)
                     model.Add(x[i] >= x[j]).OnlyEnforceIf(b_xless.Not())
                     model.Add(x[i] == x[j]).OnlyEnforceIf(b_xeq)
@@ -165,17 +165,17 @@ def add_symmetry_breaking_for_identical_boxes(model, boxes, x, y, z, symmetry_mo
                     model.Add(y[i] >= y[j]).OnlyEnforceIf(b_yless.Not())
                     model.Add(y[i] == y[j]).OnlyEnforceIf(b_yeq)
                     model.Add(y[i] != y[j]).OnlyEnforceIf(b_yeq.Not())
-                    b_xy_eq: BoolVar = model.NewBoolVar(f'sb_xyeq_{i}_{j}')
+                    b_xy_eq: BoolVarT = model.NewBoolVar(f'sb_xyeq_{i}_{j}')
                     model.AddBoolAnd([b_xeq, b_yeq]).OnlyEnforceIf(b_xy_eq)
                     model.AddBoolOr([b_xeq.Not(), b_yeq.Not()]).OnlyEnforceIf(b_xy_eq.Not())
                     model.Add(z[i] <= z[j]).OnlyEnforceIf(b_xy_eq)
-                    b_xeq_and_yless: BoolVar = model.NewBoolVar(f'sb_xeq_yless_{i}_{j}')
+                    b_xeq_and_yless: BoolVarT = model.NewBoolVar(f'sb_xeq_yless_{i}_{j}')
                     model.AddBoolAnd([b_xeq, b_yless]).OnlyEnforceIf(b_xeq_and_yless)
                     model.AddBoolOr([b_xeq.Not(), b_yless.Not()]).OnlyEnforceIf(b_xeq_and_yless.Not())
                     model.AddBoolOr([b_xless, b_xeq_and_yless, b_xy_eq])
 
 def get_total_floor_area_covered(model, n, on_floor_vars, l_eff, w_eff, container):
-    from ortools.sat.python.cp_model import CpModel, IntVar, BoolVar
+    from ortools.sat.python.cp_model import CpModel, IntVar, BoolVarT
     from typing import List
     """
     Returns a list of area variables for each box: on_floor[i] * l_eff[i] * w_eff[i].
@@ -204,7 +204,7 @@ def get_total_floor_area_covered(model, n, on_floor_vars, l_eff, w_eff, containe
     return area_vars
 
 
-def prefer_side_with_biggest_surface_at_the_bottom(perms_list, orient, boxes):
+def prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom(perms_list, orient, boxes):
     from ortools.sat.python.cp_model import BoolVarT
     from typing import List, Tuple, Dict, Any
     """

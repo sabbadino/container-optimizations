@@ -1,14 +1,14 @@
 {
-  "symmetry_breaking": "simple",
+  "symmetry_mode": "simple",
   "max_time_in_seconds": 120,
-  "preferSideWithBiggestSurfaceAtTheBottomWeight": 0.1, 
-  "preferMaximizeSurfaceContactWeight": 0,
+  "prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight": 0.1, 
+  "prefer_maximize_surface_contact_weight": 0,
 
-  "preferLargeBaseLowerNonLinearWeight": 1,
-  "preferLargeBaseLowerWeight": 0.1,
+  "prefer_large_base_lower_non_linear_weight": 1,
+  "prefer_large_base_lower_weight": 0.1,
   
-  "preferTotalFloorAreaWeight": 0,
-  "anchormode": "heavierWithinMostRecurringSimilar",
+  "prefer_total_floor_area_weight": 0,
+  "anchor_mode": "heavierWithinMostRecurringSimilar",
   "container": [10, 10, 10],
   "boxes": [
     {"id": 1, "size": [2, 2, 2], "rotation": "none", "weight": 8},

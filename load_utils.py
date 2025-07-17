@@ -6,15 +6,15 @@ def load_data_from_json(input_file):
     container = tuple(data['container'])
     boxes = data['boxes']
     symmetry_mode = data.get('symmetry_breaking', 'full')
-    max_time = data.get('max_time_in_seconds', 60)
-    anchormode = data.get('anchormode', None)
-    prefer_side_with_biggest_surface_at_the_bottom_weight = data.get('preferSideWithBiggestSurfaceAtTheBottomWeight', 0)
-    prefer_maximize_surface_contact_weight = data.get('preferMaximizeSurfaceContactWeight', 0)
-    prefer_large_base_lower_weight = data.get('preferLargeBaseLowerWeight', 0)
-    prefer_total_floor_area_weight = data.get('preferTotalFloorAreaWeight', 0)  # default 0 for backward compatibility
-    prefer_large_base_lower_non_linear_weight = data.get('preferLargeBaseLowerNonLinearWeight', 0)  # default 0
-    return (container, boxes, symmetry_mode, max_time, anchormode,
-            prefer_side_with_biggest_surface_at_the_bottom_weight,
+    max_time_in_seconds = data.get('max_time_in_seconds', 60)
+    anchor_mode = data.get('anchor_mode', None)
+    prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight = data.get('prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight', 0)
+    prefer_maximize_surface_contact_weight = data.get('prefer_maximize_surface_contact_weight', 0)
+    prefer_large_base_lower_weight = data.get('prefer_large_base_lower_weight', 0)
+    prefer_total_floor_area_weight = data.get('prefer_total_floor_area_weight', 0)  # default 0 for backward compatibility
+    prefer_large_base_lower_non_linear_weight = data.get('prefer_large_base_lower_non_linear_weight', 0)  # default 0
+    return (container, boxes, symmetry_mode, max_time_in_seconds, anchor_mode,
+            prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight,
             prefer_maximize_surface_contact_weight,
             prefer_large_base_lower_weight,
             prefer_total_floor_area_weight,
