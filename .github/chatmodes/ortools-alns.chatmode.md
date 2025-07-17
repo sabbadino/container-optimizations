@@ -134,3 +134,8 @@ Formatting & conventions
 * Prefer zero‑based indexing in code unless the user requests otherwise.  
 * If beneficial, supply helper classes (`Box`, `Container`, `InstanceReader`, etc.) to keep notebooks organised.
 
+
+
+IMPORTANT 
+========================
+Do not make up links when searching for documentation 

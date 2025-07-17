@@ -1,0 +1,70 @@
+"""
+Shared CP-SAT assignment model for container loading (step 1 and ALNS repair)
+"""
+from ortools.sat.python import cp_model
+
+def build_assignment_model(items, container_size, container_weight, max_containers, group_to_items=None, fixed_assignments=None, group_penalty_lambda=1, dump_inputs=False):
+    if dump_inputs:
+        print('****************')
+        print('INPUTS')
+        print(f'Container volume capacity: {container_size[0] * container_size[1] * container_size[2]}')
+        print(f'Container weight capacity: {container_weight}')
+        print('Item details:')
+        for i, item in enumerate(items):
+            volume = item['size'][0] * item['size'][1] * item['size'][2]
+            rotation = item.get('rotation', None)
+            group_id = item.get('group_id', None)
+            print(f'  Item {item["id"]}: weight={item["weight"]}, volume={volume}, rotation={rotation}, group_id={group_id}')
+        print('****************')
+    """
+    items: list of item dicts (must have 'id', 'size', 'weight', optional 'group_id')
+    container_size: [L, W, H]
+    container_weight: max weight per container
+    max_containers: int, upper bound on containers
+    group_to_items: dict mapping group_id to list of item indices (optional)
+    fixed_assignments: dict {item_id: container_idx} for items to fix (optional)
+    group_penalty_lambda: penalty weight for group splits
+    Returns: model, x, y, group_in_j, group_in_containers
+    """
+    model = cp_model.CpModel()
+    num_items = len(items)
+    # Variables
+    x = {}  # x[i, j] = 1 if item i in container j
+    for i in range(num_items):
+        for j in range(max_containers):
+            x[i, j] = model.NewBoolVar(f'x_{i}_{j}')
+    y = [model.NewBoolVar(f'y_{j}') for j in range(max_containers)]
+    # Constraints
+    for i in range(num_items):
+        if fixed_assignments and items[i]['id'] in fixed_assignments:
+            # Fix item to container
+            fixed_j = fixed_assignments[items[i]['id']]
+            for j in range(max_containers):
+                if j == fixed_j:
+                    model.Add(x[i, j] == 1)
+                else:
+                    model.Add(x[i, j] == 0)
+        else:
+            model.Add(sum(x[i, j] for j in range(max_containers)) == 1)
+    for j in range(max_containers):
+        model.Add(sum(items[i]['size'][0]*items[i]['size'][1]*items[i]['size'][2] * x[i, j] for i in range(num_items)) <= container_size[0]*container_size[1]*container_size[2] * y[j])
+        model.Add(sum(items[i]['weight'] * x[i, j] for i in range(num_items)) <= container_weight * y[j])
+    for j in range(max_containers):
+        for i in range(num_items):
+            model.Add(x[i, j] <= y[j])
+    # Soft grouping
+    group_in_j = {}
+    group_in_containers = {}
+    group_ids = list(group_to_items.keys()) if group_to_items else []
+    if group_ids:
+        for g in group_ids:
+            for j in range(max_containers):
+                group_in_j[g, j] = model.NewBoolVar(f'group_{g}_in_{j}')
+                item_vars = [x[i, j] for i in group_to_items[g]]
+                model.AddMaxEquality(group_in_j[g, j], item_vars)
+            group_in_containers[g] = model.NewIntVar(1, max_containers, f'group_{g}_num_containers')
+            model.Add(group_in_containers[g] == sum(group_in_j[g, j] for j in range(max_containers)))
+    # Objective
+    group_split_penalty = sum(group_in_containers[g] - 1 for g in group_ids) if group_ids else 0
+    model.Minimize(sum(y[j] for j in range(max_containers)) + group_penalty_lambda * group_split_penalty)
+    return model, x, y, group_in_j, group_in_containers, group_ids

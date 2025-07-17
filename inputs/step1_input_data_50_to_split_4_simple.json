@@ -1,0 +1,20 @@
+{  "alns_params": {
+    "num_iterations": 100,
+    "use_cpsat_repair": true,
+    "num_remove": 5,
+    "time_limit": 120.0,
+    "max_no_improve": 10
+  },
+  "step2_settings_file": "inputs/step2_settings_a.json",
+  "container": {
+    "weight": 40,
+    "size": [10, 10, 10]  
+  },
+  "items": [
+    {"id": 1,  "weight": 1, "group_id": 1, "size": [10, 5, 5], "rotation": "free" },
+    {"id": 2,  "weight": 2, "group_id": 1, "size": [4, 4, 4], "rotation": "free" },
+    {"id": 3, "weight": 1, "group_id": 1, "size": [3, 3, 3], "rotation": "none" },
+    {"id": 4, "weight": 2, "group_id": 1, "size": [2, 2, 2], "rotation": "free" }
+   
+  ]
+}

@@ -1,10 +1,10 @@
 
+
 import json
 import sys
 import datetime
-from ortools.sat.python import cp_model
-
-from step2_container_box_placement_in_container import run as step2_run 
+from assignment_model import build_assignment_model
+from step2_container_box_placement_in_container import run as step2_run
 
 def run(data):
     # Read rotation property (default to 'free' if not present)
@@ -82,58 +82,30 @@ def run(data):
     # Upper bound on containers: one per item (worst case)
     max_containers = num_items
 
-    model = cp_model.CpModel()
 
-    # Variables
-    x = {}  # x[i, j] = 1 if item i in container j
+    # Use shared assignment model
+    items = []
     for i in range(num_items):
-        for j in range(max_containers):
-            x[i, j] = model.NewBoolVar(f'x_{i}_{j}')
-
-    y = [model.NewBoolVar(f'y_{j}') for j in range(max_containers)]  # y[j] = 1 if container j is used
-
-    # Constraints
-    # Each item in exactly one container
-    for i in range(num_items):
-        model.Add(sum(x[i, j] for j in range(max_containers)) == 1)
-
-    # Container capacity constraints
-    for j in range(max_containers):
-        model.Add(sum(item_volumes[i] * x[i, j] for i in range(num_items)) <= container_volume * y[j])
-        model.Add(sum(item_weights[i] * x[i, j] for i in range(num_items)) <= container_weight * y[j])
-
-
-    # Link y[j] to usage
-    for j in range(max_containers):
-        for i in range(num_items):
-            model.Add(x[i, j] <= y[j])
-
-
-    # Soft grouping: penalize splitting a group across multiple containers
-    group_penalty_lambda = 1  # Penalty weight for splitting a group (can be parameterized)
-    group_ids = list(group_to_items.keys())
-    group_in_j = {}  # group_in_j[g, j] = 1 if any item of group g is in container j
-    group_in_containers = {}  # group_in_containers[g] = number of containers group g is split across
-    for g in group_ids:
-        for j in range(max_containers):
-            group_in_j[g, j] = model.NewBoolVar(f'group_{g}_in_{j}')
-            # group_in_j[g, j] is true iff any item of group g is placed in container j
-            item_vars = [x[i, j] for i in group_to_items[g]]
-            model.AddMaxEquality(group_in_j[g, j], item_vars)
-        # group_in_containers[g] = sum_j group_in_j[g, j]
-        group_in_containers[g] = model.NewIntVar(1, max_containers, f'group_{g}_num_containers')
-        model.Add(group_in_containers[g] == sum(group_in_j[g, j] for j in range(max_containers)))
-
-
-    # Objective: minimize number of containers used + penalty for group splits
-    # For each group, penalize (number of containers used by group - 1)
-    group_split_penalty = sum(group_in_containers[g] - 1 for g in group_ids) if group_ids else 0
-    model.Minimize(sum(y[j] for j in range(max_containers)) + group_penalty_lambda * group_split_penalty)
-
-
-    # Solve
+        item = {
+            'id': item_ids[i],
+            'size': data['items'][i]['size'],
+            'weight': item_weights[i],
+            'group_id': item_group_ids[i]
+        }
+        items.append(item)
+    group_penalty_lambda = 1
+    model, x, y, group_in_j, group_in_containers, group_ids = build_assignment_model(
+        items,
+        data['container']['size'],
+        container_weight,
+        max_containers,
+        group_to_items=group_to_items,
+        fixed_assignments=None,
+        group_penalty_lambda=group_penalty_lambda,
+        dump_inputs=True    
+    )
+    from ortools.sat.python import cp_model
     solver = cp_model.CpSolver()
-    # solver.parameters.log_search_progress = True
     status = solver.Solve(model)
 
     # Print model status
