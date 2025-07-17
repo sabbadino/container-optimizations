@@ -1,9 +1,3 @@
-
-
-
-
-
-
 import json
 import sys
 from ortools.sat.python import cp_model
@@ -22,20 +16,23 @@ def run(container_id,container, boxes, settingsfile):
     prefer_large_base_lower_weight = data.get('prefer_large_base_lower_weight', 0)
     prefer_total_floor_area_weight = data.get('prefer_total_floor_area_weight', 0)  # default 0 for backward compatibility
     prefer_large_base_lower_non_linear_weight = data.get('prefer_large_base_lower_non_linear_weight', 0)  # default 0
+    prefer_put_boxes_by_volume_lower_z_weight = data.get('prefer_put_boxes_by_volume_lower_z_weight', 0)  # default 0
 
     return run_inner(container_id,container, boxes, symmetry_mode, max_time_in_seconds, anchor_mode,
         prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight,
         prefer_maximize_surface_contact_weight,
         prefer_large_base_lower_weight,
         prefer_total_floor_area_weight,
-        prefer_large_base_lower_non_linear_weight)
+        prefer_large_base_lower_non_linear_weight,
+        prefer_put_boxes_by_volume_lower_z_weight)
 
 def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mode, \
     prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight, \
     prefer_maximize_surface_contact_weight, \
     prefer_large_base_lower_weight, \
     prefer_total_floor_area_weight, \
-    prefer_large_base_lower_non_linear_weight):
+    prefer_large_base_lower_non_linear_weight, \
+    prefer_put_boxes_by_volume_lower_z_weight):
 
     print(f'symmetry_mode:  {symmetry_mode}')
     print(f'anchormode: {anchor_mode}')
@@ -44,6 +41,7 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
     print(f'prefer_total_floor_area_weight: {prefer_total_floor_area_weight}')
     print(f'prefer_large_base_lower_weight: {prefer_large_base_lower_weight}')
     print(f'prefer_large_base_lower_non_linear_weight: {prefer_large_base_lower_non_linear_weight}')
+    print(f'prefer_put_boxes_by_volume_lower_z_weight: {prefer_put_boxes_by_volume_lower_z_weight}')
 
     # override rotation if box is a cube
     for i, item in enumerate(boxes):
@@ -75,7 +73,7 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
     apply_anchor_logic(model, anchor_mode, boxes, x, y, z)
 
 
-    from model_optimizations import add_symmetry_breaking_for_identical_boxes,prefer_put_boxes_lower_z, prefer_put_boxes_lower_z_non_linear, get_total_floor_area_covered, prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom, prefer_maximize_surface_contact
+    from model_optimizations import prefer_put_boxes_by_volume_lower_z, add_symmetry_breaking_for_identical_boxes,prefer_put_boxes_lower_z, prefer_put_boxes_lower_z_non_linear, get_total_floor_area_covered, prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom, prefer_maximize_surface_contact
 
     # Symmetry breaking for identical boxes (same size and allowed rotations)
     add_symmetry_breaking_for_identical_boxes(model, boxes, x, y, z, symmetry_mode, container)
@@ -87,6 +85,9 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
 
     # Soft constraints
     terms = []
+
+    
+
     if prefer_total_floor_area_weight:
         # Maximize total covered floor area (as a soft constraint with weight)
         area_vars = get_total_floor_area_covered(model, n, on_floor_vars, l_eff, w_eff, container)
@@ -110,6 +111,10 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
         weighted_terms_nl = prefer_put_boxes_lower_z_non_linear(model, n, z, l_eff, w_eff, container)
         delta_nl = prefer_large_base_lower_non_linear_weight
         terms.append(delta_nl * sum(weighted_terms_nl))
+    if prefer_put_boxes_by_volume_lower_z_weight:
+        weighted_terms_vol = prefer_put_boxes_by_volume_lower_z(model, n, z, l_eff, w_eff, h_eff, container)
+        delta_vol = prefer_put_boxes_by_volume_lower_z_weight
+        terms.append(delta_vol * sum(weighted_terms_vol))
     model.Maximize(sum(terms))
 
 
@@ -152,7 +157,7 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
             print(f'BoxId {boxes[i].get("id")}: pos=({solver.Value(x[i])}, {solver.Value(y[i])}, {solver.Value(z[i])}), size=({l}, {w}, {h}), orientation={orient_idx}, rotation_type={boxes[i].get("rotation", "free")}')
 
         from visualization_utils import visualize_solution
-        plt = visualize_solution(container, boxes, perms_list, orient, x, y, z, solver, n, status_str, container_id)
+        plt = visualize_solution(elapsed_time,container, boxes, perms_list, orient, x, y, z, solver, n, status_str, container_id)
   
         plt.show(block=False)
     else:
@@ -176,10 +181,15 @@ if __name__ == "__main__":
         prefer_maximize_surface_contact_weight, \
         prefer_put_boxes_lower_z_weight, \
         prefer_total_floor_area_weight, \
-        prefer_put_boxes_lower_z_non_linear_weight = load_data_from_json(input_file)
-    run(container, boxes, symmetry_mode, max_time, anchormode,
+        prefer_put_boxes_lower_z_non_linear_weight,\
+        prefer_put_boxes_by_volume_lower_z_weight = load_data_from_json(input_file)
+    run_inner(1,container, boxes, symmetry_mode, max_time, anchormode,
         prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight,
         prefer_maximize_surface_contact_weight,
         prefer_put_boxes_lower_z_weight,
         prefer_total_floor_area_weight,
-        prefer_put_boxes_lower_z_non_linear_weight)
+        prefer_put_boxes_lower_z_non_linear_weight,
+        prefer_put_boxes_by_volume_lower_z_weight)
+    
+    input("Press Enter to exit...")  # Keep the window open until user input
+    

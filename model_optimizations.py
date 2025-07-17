@@ -1,3 +1,39 @@
+def prefer_put_boxes_by_volume_lower_z(model, n, z, l_eff, w_eff, h_eff, container):
+    from ortools.sat.python.cp_model import IntVar
+    from typing import List
+    """
+    Returns a list of terms, one for each box, representing (box volume) * (height from bottom),
+    where box volume is l_eff[i] * w_eff[i] * h_eff[i] in its current orientation, and
+    height from bottom is the distance from the bottom of the container to the lower face of the box.
+
+    This is used as a soft constraint to encourage boxes with larger volume to be placed lower
+    in the container, improving stability. For boxes with free rotation, the volume is determined
+    by the chosen orientation (l_eff[i], w_eff[i], h_eff[i]).
+
+    Args:
+        model: The CpModel instance.
+        n: Number of boxes.
+        z: List of IntVar, z[i] is the z-coordinate of the lower face of box i.
+        l_eff, w_eff, h_eff: Lists of IntVar, effective length, width, and height of box i (depends on orientation).
+        container: Tuple/list of container dimensions (length, width, height).
+
+    Returns:
+        weighted_terms: List of IntVar, each representing (l_eff[i] * w_eff[i] * h_eff[i]) * (container[2] - z[i])
+    """
+    weighted_terms: List[IntVar] = []
+    max_volume: int = container[0] * container[1] * container[2]
+    for i in range(n):
+        box_volume: IntVar = model.NewIntVar(0, max_volume, f'box_volume_{i}')
+        model.AddMultiplicationEquality(box_volume, [l_eff[i], w_eff[i], h_eff[i]])
+
+        height_from_bottom: IntVar = model.NewIntVar(0, container[2], f'height_from_bottom_vol_{i}')
+        model.Add(height_from_bottom == container[2] - z[i])
+
+        weighted: IntVar = model.NewIntVar(0, max_volume * container[2], f'weighted_vol_{i}')
+        model.AddMultiplicationEquality(weighted, [box_volume, height_from_bottom])
+
+        weighted_terms.append(weighted)
+    return weighted_terms
 def prefer_put_boxes_lower_z_non_linear(model, n, z, l_eff, w_eff, container):
     from ortools.sat.python.cp_model import CpModel, IntVar
     from typing import List, Tuple, Any

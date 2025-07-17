@@ -1,4 +1,4 @@
-def visualize_solution(container, boxes, perms_list, orient, x, y, z, solver, n, status_str=None, container_id=None):
+def visualize_solution(time_taken,container, boxes, perms_list, orient, x, y, z, solver, n, status_str=None, container_id=None):
     try:
         import matplotlib.pyplot as plt
         from mpl_toolkits.mplot3d.art3d import Poly3DCollection
@@ -104,6 +104,9 @@ def visualize_solution(container, boxes, perms_list, orient, x, y, z, solver, n,
         title += f' (Container Id: {container_id})'
     if status_str:
         title += f'\nSolver status: {status_str}'
+    if time_taken:
+        title += f'\nTime taken: {time_taken:.3f} seconds'
+        
     plt.title(title)
 
     from matplotlib.lines import Line2D

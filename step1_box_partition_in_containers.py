@@ -289,15 +289,15 @@ def run(data):
 
     input("Press any key to exit ...")  # Keeps the plot open until you press Enter
 
+if __name__ == "__main__": 
+    # Get input filename from command line
+    if len(sys.argv) < 3:
+        print('Usage: python container_bin_packing.py <input_json_file> <output_json_file>')
+        sys.exit(1)
+    input_filename = sys.argv[1]
+    ouput_filename = sys.argv[2]
+    # Read input data from JSON file
 
-# Get input filename from command line
-if len(sys.argv) < 3:
-    print('Usage: python container_bin_packing.py <input_json_file> <output_json_file>')
-    sys.exit(1)
-input_filename = sys.argv[1]
-ouput_filename = sys.argv[2]
-# Read input data from JSON file
-
-with open(input_filename, 'r') as f:
-    data = json.load(f)
-    run(data)
+    with open(input_filename, 'r') as f:
+        data = json.load(f)
+        run(data)
