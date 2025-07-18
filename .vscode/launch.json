@@ -66,12 +66,12 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "ALNS step1_input_data_50_to_split_2.json",
+            "name": "ALNS alns_input_data_50_items_1.json",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/alns_container_loading.py",
             "args": [
-                "inputs/step1_input_data_50_to_split_2.json",
+                "inputs/alns_input_data_50_items_1.json",
             ],
             "console": "integratedTerminal"
         }

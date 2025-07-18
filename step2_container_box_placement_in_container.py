@@ -3,7 +3,7 @@ import sys
 from ortools.sat.python import cp_model
 from load_utils import load_data_from_json
 
-def run(container_id,container, boxes, settingsfile):
+def run(container_id,container, boxes, settingsfile, verbose=True):
     # Load settings from the JSON file
     with open(settingsfile, 'r') as f:
         data = json.load(f)         
@@ -18,13 +18,14 @@ def run(container_id,container, boxes, settingsfile):
     prefer_large_base_lower_non_linear_weight = data.get('prefer_large_base_lower_non_linear_weight', 0)  # default 0
     prefer_put_boxes_by_volume_lower_z_weight = data.get('prefer_put_boxes_by_volume_lower_z_weight', 0)  # default 0
 
-    return run_inner(container_id,container, boxes, symmetry_mode, max_time_in_seconds, anchor_mode,
+    return run_inner(
+        container_id, container, boxes, symmetry_mode, max_time_in_seconds, anchor_mode,
         prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight,
         prefer_maximize_surface_contact_weight,
         prefer_large_base_lower_weight,
         prefer_total_floor_area_weight,
         prefer_large_base_lower_non_linear_weight,
-        prefer_put_boxes_by_volume_lower_z_weight)
+        prefer_put_boxes_by_volume_lower_z_weight,verbose)
 
 def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mode, \
     prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight, \
@@ -32,21 +33,23 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
     prefer_large_base_lower_weight, \
     prefer_total_floor_area_weight, \
     prefer_large_base_lower_non_linear_weight, \
-    prefer_put_boxes_by_volume_lower_z_weight):
+    prefer_put_boxes_by_volume_lower_z_weight,verbose=True ):
 
-    print(f'symmetry_mode:  {symmetry_mode}')
-    print(f'anchormode: {anchor_mode}')
-    print(f'prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight: {prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight}')
-    print(f'prefer_maximize_surface_contact_weight: {prefer_maximize_surface_contact_weight}')
-    print(f'prefer_total_floor_area_weight: {prefer_total_floor_area_weight}')
-    print(f'prefer_large_base_lower_weight: {prefer_large_base_lower_weight}')
-    print(f'prefer_large_base_lower_non_linear_weight: {prefer_large_base_lower_non_linear_weight}')
-    print(f'prefer_put_boxes_by_volume_lower_z_weight: {prefer_put_boxes_by_volume_lower_z_weight}')
+    if verbose:
+        print(f'symmetry_mode:  {symmetry_mode}')
+        print(f'anchormode: {anchor_mode}')
+        print(f'prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight: {prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight}')
+        print(f'prefer_maximize_surface_contact_weight: {prefer_maximize_surface_contact_weight}')
+        print(f'prefer_total_floor_area_weight: {prefer_total_floor_area_weight}')
+        print(f'prefer_large_base_lower_weight: {prefer_large_base_lower_weight}')
+        print(f'prefer_large_base_lower_non_linear_weight: {prefer_large_base_lower_non_linear_weight}')
+        print(f'prefer_put_boxes_by_volume_lower_z_weight: {prefer_put_boxes_by_volume_lower_z_weight}')
 
     # override rotation if box is a cube
     for i, item in enumerate(boxes):
         if item['size'][0] == item['size'][1] == item['size'][2] and item.get('rotation') != 'fixed' :
-            print(f"Item {i} is a cube, setting rotation from {item['rotation']} to 'fixed'")
+            if verbose:
+                print(f"\033[90mItem {i} is a cube, setting rotation from {item['rotation']} to 'fixed'\033[0m")
             item['rotation'] = 'fixed'
 
 
@@ -148,22 +151,30 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
     print(f'Step 2 Solver status: {color}{status_str}{endc}')  
     print(f'Solver time: {elapsed_time:.3f} seconds')
 
+
+    placements = []
     if status == cp_model.FEASIBLE or status == cp_model.OPTIMAL:
         for i in range(n):
             # Find which orientation is selected
             orient_val = [solver.Value(orient[i][k]) for k in range(len(orient[i]))]
-            orient_idx = orient_val.index(1)
-            l, w, h = perms_list[i][orient_idx]
-            print(f'BoxId {boxes[i].get("id")}: pos=({solver.Value(x[i])}, {solver.Value(y[i])}, {solver.Value(z[i])}), size=({l}, {w}, {h}), orientation={orient_idx}, rotation_type={boxes[i].get("rotation", "free")}')
+            orient_idx = orient_val.index(1) if 1 in orient_val else None
+            l, w, h = perms_list[i][orient_idx] if orient_idx is not None else (None, None, None)
+            pos = (solver.Value(x[i]), solver.Value(y[i]), solver.Value(z[i])) if orient_idx is not None else (None, None, None)
+            placements.append({
+                'id': boxes[i].get('id'),
+                'position': pos,
+                'orientation': orient_idx,
+                'size': (l, w, h),
+                'rotation_type': boxes[i].get('rotation', 'free')
+            })
+            print(f'BoxId {boxes[i].get("id")}: pos={pos}, size=({l}, {w}, {h}), orientation={orient_idx}, rotation_type={boxes[i].get("rotation", "free")})')
 
         from visualization_utils import visualize_solution
         plt = visualize_solution(elapsed_time,container, boxes, perms_list, orient, x, y, z, solver, n, status_str, container_id)
-  
         plt.show(block=False)
     else:
         print('No solution found.')
-    
-    return status_str
+    return status_str, placements
 
 
 

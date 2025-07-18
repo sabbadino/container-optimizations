@@ -3,7 +3,7 @@ Shared CP-SAT assignment model for container loading (step 1 and ALNS repair)
 """
 from ortools.sat.python import cp_model
 
-def build_assignment_model(items, container_size, container_weight, max_containers, group_to_items=None, fixed_assignments=None, group_penalty_lambda=1, dump_inputs=False):
+def build_step1_assignment_model(items, container_size, container_weight, max_containers, group_to_items=None, fixed_assignments=None, group_penalty_lambda=1, dump_inputs=False):
     if dump_inputs:
         print('****************')
         print('INPUTS')
@@ -53,7 +53,7 @@ def build_assignment_model(items, container_size, container_weight, max_containe
         for i in range(num_items):
             model.Add(x[i, j] <= y[j])
     # Soft grouping
-    group_in_j = {}
+    group_in_j = {}  # No longer used, will be removed
     group_in_containers = {}
     group_ids = list(group_to_items.keys()) if group_to_items else []
     if group_ids:
@@ -67,4 +67,4 @@ def build_assignment_model(items, container_size, container_weight, max_containe
     # Objective
     group_split_penalty = sum(group_in_containers[g] - 1 for g in group_ids) if group_ids else 0
     model.Minimize(sum(y[j] for j in range(max_containers)) + group_penalty_lambda * group_split_penalty)
-    return model, x, y, group_in_j, group_in_containers, group_ids
+    return model, x, y, group_in_containers, group_ids

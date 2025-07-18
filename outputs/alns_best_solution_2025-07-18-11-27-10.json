@@ -1,0 +1,590 @@
+{
+  "assignment": [
+    {
+      "id": 1,
+      "size": [
+        10,
+        10,
+        10
+      ],
+      "boxes": [
+        {
+          "id": 33,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 36,
+          "size": [
+            3,
+            3,
+            3
+          ],
+          "weight": 2,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 50,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 26,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 28,
+          "size": [
+            3,
+            3,
+            3
+          ],
+          "weight": 2,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 30,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 32,
+          "size": [
+            3,
+            3,
+            3
+          ],
+          "weight": 2,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 48,
+          "size": [
+            3,
+            3,
+            3
+          ],
+          "weight": 2,
+          "group_id": null,
+          "rotation": "fixed"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "size": [
+        10,
+        10,
+        10
+      ],
+      "boxes": [
+        {
+          "id": 17,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": 4,
+          "rotation": "fixed"
+        },
+        {
+          "id": 6,
+          "size": [
+            5,
+            5,
+            5
+          ],
+          "weight": 1,
+          "group_id": 2,
+          "rotation": "fixed"
+        },
+        {
+          "id": 15,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": 3,
+          "rotation": "fixed"
+        },
+        {
+          "id": 38,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 40,
+          "size": [
+            3,
+            3,
+            3
+          ],
+          "weight": 2,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 44,
+          "size": [
+            3,
+            3,
+            3
+          ],
+          "weight": 2,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 34,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 7,
+          "size": [
+            4,
+            4,
+            4
+          ],
+          "weight": 2,
+          "group_id": 2,
+          "rotation": "fixed"
+        },
+        {
+          "id": 8,
+          "size": [
+            3,
+            3,
+            3
+          ],
+          "weight": 1,
+          "group_id": 2,
+          "rotation": "fixed"
+        },
+        {
+          "id": 9,
+          "size": [
+            4,
+            4,
+            4
+          ],
+          "weight": 2,
+          "group_id": 2,
+          "rotation": "fixed"
+        },
+        {
+          "id": 10,
+          "size": [
+            3,
+            3,
+            3
+          ],
+          "weight": 1,
+          "group_id": 2,
+          "rotation": "fixed"
+        },
+        {
+          "id": 11,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": 3,
+          "rotation": "fixed"
+        },
+        {
+          "id": 12,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": 3,
+          "rotation": "fixed"
+        },
+        {
+          "id": 13,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": 3,
+          "rotation": "fixed"
+        },
+        {
+          "id": 14,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": 3,
+          "rotation": "fixed"
+        },
+        {
+          "id": 16,
+          "size": [
+            5,
+            5,
+            5
+          ],
+          "weight": 3,
+          "group_id": 4,
+          "rotation": "fixed"
+        },
+        {
+          "id": 18,
+          "size": [
+            5,
+            5,
+            5
+          ],
+          "weight": 3,
+          "group_id": 4,
+          "rotation": "fixed"
+        },
+        {
+          "id": 19,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": 4,
+          "rotation": "fixed"
+        },
+        {
+          "id": 20,
+          "size": [
+            5,
+            5,
+            5
+          ],
+          "weight": 3,
+          "group_id": 4,
+          "rotation": "fixed"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "size": [
+        10,
+        10,
+        10
+      ],
+      "boxes": [
+        {
+          "id": 24,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": 5,
+          "rotation": "fixed"
+        },
+        {
+          "id": 21,
+          "size": [
+            3,
+            3,
+            3
+          ],
+          "weight": 2,
+          "group_id": 5,
+          "rotation": "fixed"
+        },
+        {
+          "id": 42,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 1,
+          "size": [
+            10,
+            5,
+            5
+          ],
+          "weight": 1,
+          "group_id": 1,
+          "rotation": "free"
+        },
+        {
+          "id": 2,
+          "size": [
+            4,
+            4,
+            4
+          ],
+          "weight": 2,
+          "group_id": 1,
+          "rotation": "fixed"
+        },
+        {
+          "id": 3,
+          "size": [
+            3,
+            3,
+            3
+          ],
+          "weight": 1,
+          "group_id": 1,
+          "rotation": "fixed"
+        },
+        {
+          "id": 4,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 2,
+          "group_id": 1,
+          "rotation": "fixed"
+        },
+        {
+          "id": 5,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "weight": 1,
+          "group_id": 1,
+          "rotation": "fixed"
+        },
+        {
+          "id": 22,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": 5,
+          "rotation": "fixed"
+        },
+        {
+          "id": 23,
+          "size": [
+            3,
+            3,
+            3
+          ],
+          "weight": 2,
+          "group_id": 5,
+          "rotation": "fixed"
+        },
+        {
+          "id": 25,
+          "size": [
+            3,
+            3,
+            3
+          ],
+          "weight": 2,
+          "group_id": 5,
+          "rotation": "fixed"
+        },
+        {
+          "id": 27,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 29,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 31,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 35,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 37,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 39,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 41,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 43,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 45,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 46,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 47,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        },
+        {
+          "id": 49,
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "weight": 1,
+          "group_id": null,
+          "rotation": "fixed"
+        }
+      ]
+    }
+  ],
+  "statuses": [
+    "OPTIMAL",
+    "OPTIMAL",
+    "FEASIBLE"
+  ],
+  "aggregate_score": -6.557
+}

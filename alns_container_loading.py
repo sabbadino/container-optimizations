@@ -24,11 +24,14 @@ def dump_phase1_results(
     output_md = []
     output_md.append('## OUTPUTS')
     output_md.append(f'Step 1 Solver status: {status_dict.get(status, status)}')
+    print('')
+    print(f'******** PHASE 1 OUTPUT ********')
+    print(f'Step 1 Solver status: {status_dict.get(status, status)}')
     if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         min_containers = int(sum(solver.Value(y[j]) for j in range(max_containers)))
         group_splits = {g: solver.Value(group_in_containers[g]) - 1 for g in group_ids}
         total_group_splits = sum(group_splits.values())
-        print(f'\nMinimum containers used: {min_containers}')
+        print(f'Minimum containers used: {min_containers}')
         print(f'Total group splits (penalized): {total_group_splits}')
         output_md.append(f'- Minimum containers used: {min_containers}')
         output_md.append(f'- Total group splits (penalized): {total_group_splits}')
@@ -42,15 +45,25 @@ def dump_phase1_results(
             total_volume = sum(item_volumes[i] for i in items_in_container)
             pct_weight = 100 * total_weight / container_weight if container_weight > 0 else 0
             pct_volume = 100 * total_volume / container_volume if container_volume > 0 else 0
+            print('')
+            print(f'### Container {new_j}')
+            print('| Item id | Weight | Volume | Group id |')
+            
             output_md.append(f'### Container {new_j}')
             output_md.append('| Item id | Weight | Volume | Group id |')
             output_md.append('|---------|--------|--------|----------|')
             for i in items_in_container:
                 output_md.append(f'| {item_ids[i]} | {item_weights[i]} | {item_volumes[i]} | {item_group_ids[i]} |')
+                print(f'| {item_ids[i]} | {item_weights[i]} | {item_volumes[i]} | {item_group_ids[i]} |')
             output_md.append(f'**Total for container {new_j}: weight = {total_weight} ({pct_weight:.1f}% of max), volume = {total_volume} ({pct_volume:.1f}% of max)**\n')
+            print(f'**Total for container {new_j}: weight = {total_weight} ({pct_weight:.1f}% of max), volume = {total_volume} ({pct_volume:.1f}% of max)**')
         if group_ids:
+            print('')
+            print('### Group Splits')
             output_md.append('### Group Splits')
+            print('| Group id | Containers used | Splits (penalized) | Container numbers |')
             output_md.append('| Group id | Containers used | Splits (penalized) | Container numbers |')
+            print('|----------|----------------|--------------------|-------------------|')
             output_md.append('|----------|----------------|--------------------|-------------------|')
             for g in group_ids:
                 containers_for_group = []
@@ -59,7 +72,9 @@ def dump_phase1_results(
                         containers_for_group.append(str(container_rebase[old_j]))
                 containers_str = ', '.join(containers_for_group)
                 output_md.append(f'| {g} | {solver.Value(group_in_containers[g])} | {group_splits[g]} | {containers_str} |')
+                print(f'| {g} | {solver.Value(group_in_containers[g])} | {group_splits[g]} | {containers_str} |')
             output_md.append('')
+            print('')
     else:
         print('No solution found.')
         output_md.append('No solution found.')
@@ -78,12 +93,14 @@ def dump_phase1_results(
                 f.write('\n'.join(output_md))
         if sys.platform.startswith('win'):
             os.startfile(os.path.abspath(md_filename))
+    print(f'********************************')
+
 """
 ALNS framework for container loading: solution evaluation and acceptance criteria template
 """
 import copy
 import random
-from step2_container_box_placement_in_container import run as step2_run
+from step2_container_box_placement_in_container import run as run_phase_2
 
 class ContainerLoadingSolution:
     def __init__(self, assignment, container_size, step2_settings_file):
@@ -99,22 +116,34 @@ class ContainerLoadingSolution:
         self.soft_scores = []  # soft objective scores per container (to be filled)
         self.aggregate_score = None
 
-    def evaluate(self):
+    def evaluate(self,verbose=True):
         """
         For each container, run step 2 and collect status and soft objective score.
+        Also update each box in the assignment with its actual orientation and position.
         """
         self.statuses = []
         self.soft_scores = []
         container_volume = self.container_size[0] * self.container_size[1] * self.container_size[2]
         for container in self.assignment:
+            print(f'**** Running phase 2 for container {container["id"]} with size {self.container_size}')
             boxes = container.get('boxes', [])
             if not boxes:
                 self.statuses.append('UNFEASIBLE')
                 self.soft_scores.append(1)  # worst utilization
                 continue
-            # Run step 2 placement
-            status = step2_run(container['id'], self.container_size, boxes, self.step2_settings_file)
+            # Run step 2 placement and get placements
+            status, placements = run_phase_2(container['id'], self.container_size, boxes, self.step2_settings_file,verbose)
+            print(f'Completed run of phase 2 for container {container["id"]} with size {self.container_size}')
             self.statuses.append(status)
+            # Update each box in container['boxes'] with its actual orientation and position
+            # placements is a list of dicts with 'id', 'position', 'orientation', 'size', ...
+            placement_map = {p['id']: p for p in placements}
+            for box in boxes:
+                p = placement_map.get(box['id'])
+                if p is not None:
+                    box['final_position'] = p['position']
+                    box['final_orientation'] = p['orientation']
+                    box['final_size'] = p['size']
             # Phase 1 soft score: 1 - volume utilization
             total_box_volume = sum(box['size'][0] * box['size'][1] * box['size'][2] for box in boxes)
             volume_utilization = total_box_volume / container_volume if container_volume > 0 else 0
@@ -126,7 +155,9 @@ class ContainerLoadingSolution:
         optimal_bonus = 2 * self.statuses.count('OPTIMAL')
         feasible_bonus = 1 * self.statuses.count('FEASIBLE')
         self.aggregate_score = penalty - optimal_bonus - feasible_bonus - sum(self.soft_scores)
-        print(f'Aggregate score: {self.aggregate_score} (penalty={penalty}, optimal_bonus={optimal_bonus}, feasible_bonus={feasible_bonus}, soft_scores={self.soft_scores})')
+        # Print in blue color using ANSI escape code
+        print('')
+        print(f'\033[94mAggregate score: {self.aggregate_score} (equal to penalty={penalty} - optimal_bonus={optimal_bonus} - feasible_bonus={feasible_bonus} - soft_scores={sum(self.soft_scores)})\033[0m')
         return self.aggregate_score
 
     def is_feasible(self):
@@ -140,7 +171,11 @@ def acceptance_criteria(new_solution, current_best_score):
     if not new_solution.is_feasible():
         return False
     print(f'New solution aggregate score: {new_solution.aggregate_score}, current best score: {current_best_score}')
-    return new_solution.aggregate_score < current_best_score or random.random() < 0.05
+    return_value =  new_solution.aggregate_score < current_best_score or random.random() < 0.05
+    # Print in green if True, red if False
+    color = '\033[92m' if return_value else '\033[91m'
+    print(f'{color}Acceptance return value: {return_value}\033[0m')
+    return return_value
 
 # Example usage:
 # solution = ContainerLoadingSolution(assignment, container_size, step2_settings_file)
@@ -178,19 +213,6 @@ def destroy_random_items(solution, num_remove=5):
 
 # Example ALNS iteration
 
-def alns_iteration(current_solution, container_size, step2_settings_file, container_weight, num_remove=5, use_cpsat_repair=False):
-    """
-    Main ALNS iteration: destroy, repair, evaluate.
-    If use_cpsat_repair is True, use CP-SAT-based repair; else use greedy fit.
-    """
-    # Destroy phase
-    partial_assignment, removed_items = destroy_random_items(current_solution, num_remove)
-    # Repair phase (CP-SAT only)
-    new_assignment = repair_cpsat(partial_assignment, removed_items, container_size, container_weight)
-    # Build new solution
-    new_solution = ContainerLoadingSolution(new_assignment, container_size, step2_settings_file)
-    new_solution.evaluate()
-    return new_solution
 
 # --- CP-SAT-based Repair Operator Template ---
 def repair_cpsat(partial_assignment, removed_items, container_size, container_weight):
@@ -199,7 +221,7 @@ def repair_cpsat(partial_assignment, removed_items, container_size, container_we
     Returns a new complete assignment.
     """
     # Use shared assignment model for consistency
-    from assignment_model import build_assignment_model
+    from assignment_model import build_step1_assignment_model
     import copy
     # Prepare items: combine removed_items and fixed items
     all_items = []
@@ -242,7 +264,7 @@ def repair_cpsat(partial_assignment, removed_items, container_size, container_we
     max_containers = len(partial_assignment) + len(removed_items)
     # Build model
     group_penalty_lambda = 1
-    model, x, y, group_in_j, group_in_containers, group_ids = build_assignment_model(
+    model, x, y, group_in_containers, group_ids = build_step1_assignment_model(
         all_items,
         container_size,
         container_weight,
@@ -250,7 +272,7 @@ def repair_cpsat(partial_assignment, removed_items, container_size, container_we
         group_to_items=group_to_items,
         fixed_assignments=fixed_assignments,
         group_penalty_lambda=group_penalty_lambda,
-        dump_inputs=True    
+        dump_inputs=False    
     )
     from ortools.sat.python import cp_model
     solver = cp_model.CpSolver()
@@ -287,9 +309,11 @@ def run_alns(
     max_no_improve: stop after N iterations with no improvement
     """
     import time
+    print('***** Starting ALNS loop ...')
+    print('***** Getting step 2 baseline ...')
     best_solution = ContainerLoadingSolution(initial_assignment, container_size, step2_settings_file)
-    best_score = best_solution.evaluate()
-    print(f'Initial solution: aggregate_score={best_score}, statuses={best_solution.statuses}')
+    best_score = best_solution.evaluate(True)
+    print(f'Initial step 2 solution: aggregate_score={best_score}, statuses={best_solution.statuses}')
     current_solution = copy.deepcopy(best_solution)
     history = []
     no_improve_count = 0
@@ -302,6 +326,8 @@ def run_alns(
             break
         # Time limit check
         elapsed = time.time() - start_time
+        # Print in orange color using ANSI escape code (color 208)
+        print(f'\033[38;5;208mIteration {it+1}/{num_iterations}, elapsed time: {elapsed:.2f}s, no_improve_count: {no_improve_count}\033[0m')
         if elapsed > time_limit:
             print(f'Early exit: time limit {time_limit}s reached at iteration {it+1}.')
             break
@@ -313,7 +339,7 @@ def run_alns(
         partial_assignment, removed_items = destroy_random_items(current_solution, num_remove)
         new_assignment = repair_cpsat(partial_assignment, removed_items, container_size, container_weight)
         new_solution = ContainerLoadingSolution(new_assignment, container_size, step2_settings_file)
-        score = new_solution.evaluate()
+        score = new_solution.evaluate(False)
         accepted = acceptance_criteria(new_solution, best_score)
         # Logging
         print(f'Iter {it+1:03d}: score={score:.2f}, statuses={new_solution.statuses}, accepted={accepted}, time={time.time()-t0:.2f}s')
@@ -321,11 +347,12 @@ def run_alns(
         if accepted and score < best_score:
             best_solution = copy.deepcopy(new_solution)
             best_score = score
-            print(f'  New best solution found!')
+            print(f'\033[92m  New best solution found!\033[0m')
             no_improve_count = 0
         else:
             no_improve_count += 1
         current_solution = copy.deepcopy(new_solution) if accepted else current_solution
+        print('***** END OF ALNS LOOP *****')
     print(f'ALNS finished. Best aggregate_score={best_score}, statuses={best_solution.statuses}')
     return best_solution, history
 
@@ -336,6 +363,7 @@ if __name__ == "__main__":
         print('Usage: python alns_container_loading.py <input_json_file>')
         sys.exit(1)
     input_filename = sys.argv[1]
+    print (f'Reading input from {input_filename}')
     with open(input_filename, 'r') as f:
         data = json.load(f)
     container_size = data['container']['size']
@@ -363,15 +391,15 @@ if __name__ == "__main__":
             group_to_items[gid].append(idx)
     max_containers = len(items)
     group_penalty_lambda = 1
-    from assignment_model import build_assignment_model
-    model, x, y, group_in_j, group_in_containers, group_ids = build_assignment_model(
+    from assignment_model import build_step1_assignment_model
+    model, x, y, group_in_containers, group_ids = build_step1_assignment_model(
         items,
         container_size,
         container_weight,
         max_containers,
         group_to_items=group_to_items,
         fixed_assignments=None,
-        group_penalty_lambda=group_penalty_lambda
+        group_penalty_lambda=group_penalty_lambda,dump_inputs=True
     )
     # Prepare input markdown for reporting
     input_md = []
@@ -388,15 +416,14 @@ if __name__ == "__main__":
         input_md.append(f'| {items[i]["id"]} | {items[i]["weight"]} | {volume} | {rotation} | {items[i].get("group_id", None)} |')
     input_md.append('')
     from ortools.sat.python import cp_model
+    print (f'Running phase 1 baseline.')
     solver = cp_model.CpSolver()
     status = solver.Solve(model)
     # Dump results for initial assignment
     dump_phase1_results(
         solver, status, x, y, group_in_containers, group_ids, group_to_items,
         items, container_size, container_weight, input_md=input_md, filename_prefix='container_bin_packing_result', write_md=False)
-    from ortools.sat.python import cp_model
-    solver = cp_model.CpSolver()
-    status = solver.Solve(model)
+
     # Extract assignment in same format as step1_box_partition_in_containers.py
     initial_assignment = []
     used_container_indices = [j for j in range(max_containers) if solver.Value(y[j])]
@@ -417,6 +444,7 @@ if __name__ == "__main__":
     time_limit = alns_params['time_limit']
     max_no_improve = alns_params['max_no_improve']
     # Run ALNS
+    print('calling ALNS loop...')
     best_solution, history = run_alns(
         initial_assignment, container_size, container_weight, step2_settings_file,
         num_iterations=num_iterations, num_remove=num_remove,
@@ -427,3 +455,4 @@ if __name__ == "__main__":
     with open(out_json, 'w', encoding='utf-8') as fout:
         json.dump({'assignment': best_solution.assignment, 'statuses': best_solution.statuses, 'aggregate_score': best_solution.aggregate_score}, fout, indent=2)
     print(f'Best solution written to {out_json}')
+    input("Press any key to exit (it will close container visualization windows)")

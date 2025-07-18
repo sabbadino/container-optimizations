@@ -3,8 +3,8 @@
 import json
 import sys
 import datetime
-from assignment_model import build_assignment_model
-from step2_container_box_placement_in_container import run as step2_run
+from assignment_model import build_step1_assignment_model
+from step2_container_box_placement_in_container import run as run_phase_2
 
 def run(data, output_filename):
     # Read rotation property (default to 'free' if not present)
@@ -94,7 +94,7 @@ def run(data, output_filename):
         }
         items.append(item)
     group_penalty_lambda = 1
-    model, x, y, group_in_j, group_in_containers, group_ids = build_assignment_model(
+    model, x, y, group_in_containers, group_ids = build_step1_assignment_model(
         items,
         data['container']['size'],
         container_weight,
@@ -254,7 +254,7 @@ def run(data, output_filename):
                 continue
             print(f'Running step 2 for container {container["id"]} with {len(boxes)} boxes...')     
 
-            status_str2 = step2_run(container["id"],data['container']['size'], boxes, step_2_settings_file)
+            status_str2 = run_phase_2(container["id"],data['container']['size'], boxes, step_2_settings_file)
             if( status_str2 != 'OPTIMAL' and status_str2 != 'FEASIBLE'):
                 print(f'Step 2 failed for container {container["id"]}: {status_str2}')
                 input("Press any key to continue loop ...")
