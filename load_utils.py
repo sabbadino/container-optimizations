@@ -5,7 +5,7 @@ def load_data_from_json(input_file):
         data = json.load(f)
     container = tuple(data['container'])
     boxes = data['boxes']
-    symmetry_mode = data.get('symmetry_breaking', 'full')
+    symmetry_mode = data.get('symmetry_mode', 'full')
     max_time_in_seconds = data.get('max_time_in_seconds', 60)
     anchor_mode = data.get('anchor_mode', None)
     prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight = data.get('prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight', 0)
