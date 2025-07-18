@@ -67,7 +67,11 @@ def run(data):
             if all(box_size[d] <= container_size[d] for d in range(3)):
                 fits = True
         if not fits:
-            raise ValueError("Item {} with size {} does not fit in container of size {} (rotation={})".format(item_ids[i], box_size, container_size, rotation))
+            raise ValueError(
+                "Item {} with size {} does not fit in container of size {} (rotation={})".format(
+                    item_ids[i], box_size, container_size, item_rotations[i]
+                )
+            )
 
 
 
