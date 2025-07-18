@@ -13,25 +13,25 @@ def run(container_id,container, boxes, settingsfile):
     anchor_mode = data.get('anchor_mode', None)
     prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight = data.get('prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight', 0)
     prefer_maximize_surface_contact_weight = data.get('prefer_maximize_surface_contact_weight', 0)
-    prefer_large_base_lower_weight = data.get('prefer_large_base_lower_weight', 0)
+    prefer_put_boxes_lower_z_weight = data.get('prefer_put_boxes_lower_z_weight', 0)
     prefer_total_floor_area_weight = data.get('prefer_total_floor_area_weight', 0)  # default 0 for backward compatibility
-    prefer_large_base_lower_non_linear_weight = data.get('prefer_large_base_lower_non_linear_weight', 0)  # default 0
+    prefer_put_boxes_lower_z_non_linear_weight = data.get('prefer_put_boxes_lower_z_non_linear_weight', 0)  # default 0
     prefer_put_boxes_by_volume_lower_z_weight = data.get('prefer_put_boxes_by_volume_lower_z_weight', 0)  # default 0
 
     return run_inner(container_id,container, boxes, symmetry_mode, max_time_in_seconds, anchor_mode,
         prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight,
         prefer_maximize_surface_contact_weight,
-        prefer_large_base_lower_weight,
+        prefer_put_boxes_lower_z_weight,
         prefer_total_floor_area_weight,
-        prefer_large_base_lower_non_linear_weight,
+        prefer_put_boxes_lower_z_non_linear_weight,
         prefer_put_boxes_by_volume_lower_z_weight)
 
 def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mode, \
     prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight, \
     prefer_maximize_surface_contact_weight, \
-    prefer_large_base_lower_weight, \
+    prefer_put_boxes_lower_z_weight, \
     prefer_total_floor_area_weight, \
-    prefer_large_base_lower_non_linear_weight, \
+    prefer_put_boxes_lower_z_non_linear_weight, \
     prefer_put_boxes_by_volume_lower_z_weight):
 
     print(f'symmetry_mode:  {symmetry_mode}')
@@ -39,8 +39,8 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
     print(f'prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight: {prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight}')
     print(f'prefer_maximize_surface_contact_weight: {prefer_maximize_surface_contact_weight}')
     print(f'prefer_total_floor_area_weight: {prefer_total_floor_area_weight}')
-    print(f'prefer_large_base_lower_weight: {prefer_large_base_lower_weight}')
-    print(f'prefer_large_base_lower_non_linear_weight: {prefer_large_base_lower_non_linear_weight}')
+    print(f'prefer_put_boxes_lower_z_weight: {prefer_put_boxes_lower_z_weight}')
+    print(f'prefer_put_boxes_lower_z_non_linear_weight: {prefer_put_boxes_lower_z_non_linear_weight}')
     print(f'prefer_put_boxes_by_volume_lower_z_weight: {prefer_put_boxes_by_volume_lower_z_weight}')
 
     # override rotation if box is a cube
@@ -103,13 +103,13 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
         beta = prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight
         terms.append(beta * sum(preferred_orient_vars))
     
-    if prefer_large_base_lower_weight:
+    if prefer_put_boxes_lower_z_weight:
         weighted_terms = prefer_put_boxes_lower_z(model, n, z, l_eff, w_eff, container)
-        delta = prefer_large_base_lower_weight
+        delta = prefer_put_boxes_lower_z_weight
         terms.append(delta * sum(weighted_terms))
-    if prefer_large_base_lower_non_linear_weight:
+    if prefer_put_boxes_lower_z_non_linear_weight:
         weighted_terms_nl = prefer_put_boxes_lower_z_non_linear(model, n, z, l_eff, w_eff, container)
-        delta_nl = prefer_large_base_lower_non_linear_weight
+        delta_nl = prefer_put_boxes_lower_z_non_linear_weight
         terms.append(delta_nl * sum(weighted_terms_nl))
     if prefer_put_boxes_by_volume_lower_z_weight:
         weighted_terms_vol = prefer_put_boxes_by_volume_lower_z(model, n, z, l_eff, w_eff, h_eff, container)
