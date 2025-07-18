@@ -137,7 +137,7 @@ def test_can_fit_geometrically_1():
 
     # Visualize the solution
     from visualization_utils import visualize_solution
-    visualize_solution(container, boxes, perms_list, orient, x, y, z, solver, n)
+    visualize_solution(0, container, boxes, perms_list, orient, x, y, z, solver, n)
 
 def test_can_fit_geometrically_2():
     from model_setup import setup_3d_bin_packing_model
@@ -188,7 +188,7 @@ def test_can_fit_geometrically_2():
 
     # Visualize the solution
     from visualization_utils import visualize_solution
-    visualize_solution(container, boxes, perms_list, orient, x, y, z, solver, n)
+    visualize_solution(0, container, boxes, perms_list, orient, x, y, z, solver, n)
 
 def test_can_fit_geometrically_3():
     from model_setup import setup_3d_bin_packing_model
@@ -246,5 +246,5 @@ def test_can_fit_geometrically_3():
 
     # Visualize the solution
     from visualization_utils import visualize_solution
-    visualize_solution(container, boxes, perms_list, orient, x, y, z, solver, n)
+    visualize_solution(0, container, boxes, perms_list, orient, x, y, z, solver, n)
 
