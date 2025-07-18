@@ -3,10 +3,10 @@ import sys
 from ortools.sat.python import cp_model
 from load_utils import load_data_from_json
 
-def run(container_id,container, boxes, settingsfile, verbose=True):
+def run_phase_2(container_id, container, boxes, settingsfile, verbose=True, visualize=True):
     # Load settings from the JSON file
     with open(settingsfile, 'r') as f:
-        data = json.load(f)         
+        data = json.load(f)
 
     symmetry_mode = data.get('symmetry_mode', 'full')
     max_time_in_seconds = data.get('max_time_in_seconds', 60)
@@ -25,7 +25,9 @@ def run(container_id,container, boxes, settingsfile, verbose=True):
         prefer_large_base_lower_weight,
         prefer_total_floor_area_weight,
         prefer_large_base_lower_non_linear_weight,
-        prefer_put_boxes_by_volume_lower_z_weight,verbose)
+        prefer_put_boxes_by_volume_lower_z_weight,
+        verbose,
+        visualize)
 
 def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mode, \
     prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight, \
@@ -33,7 +35,7 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
     prefer_large_base_lower_weight, \
     prefer_total_floor_area_weight, \
     prefer_large_base_lower_non_linear_weight, \
-    prefer_put_boxes_by_volume_lower_z_weight,verbose=True ):
+    prefer_put_boxes_by_volume_lower_z_weight,verbose=True, visualize=True ):
 
     if verbose:
         print(f'symmetry_mode:  {symmetry_mode}')
@@ -169,9 +171,10 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
             })
             print(f'BoxId {boxes[i].get("id")}: pos={pos}, size=({l}, {w}, {h}), orientation={orient_idx}, rotation_type={boxes[i].get("rotation", "free")})')
 
-        from visualization_utils import visualize_solution
-        plt = visualize_solution(elapsed_time,container, boxes, perms_list, orient, x, y, z, solver, n, status_str, container_id)
-        plt.show(block=False)
+        if visualize:
+            from visualization_utils import visualize_solution
+            plt = visualize_solution(elapsed_time,container, boxes, perms_list, orient, x, y, z, solver, n, status_str, container_id)
+            plt.show(block=False)
     else:
         print('No solution found.')
     return status_str, placements

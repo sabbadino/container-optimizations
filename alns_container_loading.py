@@ -100,7 +100,7 @@ ALNS framework for container loading: solution evaluation and acceptance criteri
 """
 import copy
 import random
-from step2_container_box_placement_in_container import run as run_phase_2
+from step2_container_box_placement_in_container import run_phase_2 
 
 class ContainerLoadingSolution:
     def __init__(self, assignment, container_size, step2_settings_file):
@@ -132,7 +132,7 @@ class ContainerLoadingSolution:
                 self.soft_scores.append(1)  # worst utilization
                 continue
             # Run step 2 placement and get placements
-            status, placements = run_phase_2(container['id'], self.container_size, boxes, self.step2_settings_file,verbose)
+            status, placements = run_phase_2(container['id'], self.container_size, boxes, self.step2_settings_file,verbose,False)
             print(f'Completed run of phase 2 for container {container["id"]} with size {self.container_size}')
             self.statuses.append(status)
             # Update each box in container['boxes'] with its actual orientation and position

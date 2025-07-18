@@ -4,7 +4,7 @@ import json
 import sys
 import datetime
 from assignment_model import build_step1_assignment_model
-from step2_container_box_placement_in_container import run as run_phase_2
+from step2_container_box_placement_in_container import run_phase_2 as run_phase_2
 
 def run(data, output_filename):
     # Read rotation property (default to 'free' if not present)
