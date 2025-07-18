@@ -71,9 +71,6 @@ def test_cannot_fit_geometrically_1():
     from model_setup import setup_3d_bin_packing_model
     model = cp_model.CpModel()
     # Use box/cont dicts compatible with model_setup
-    boxes = [{"size": (1, 1, 4), "id": 1, "rotation": "none"}]
-    boxes = [{"size": (1, 1, 4), "id": 2, "rotation": "none"}]
-    boxes = [{"size": (1, 1, 4), "id": 3, "rotation": "none"}]
     boxes = [{"size": (1, 1, 4), "id": 4, "rotation": "none"}]        
     container = (4, 4, 1)
     n, x, y, z, perms_list, orient, l_eff, w_eff, h_eff = setup_3d_bin_packing_model(model, container, boxes)
@@ -185,10 +182,6 @@ def test_can_fit_geometrically_2():
                 zi + hi <= zj or zj + hj <= zi
             )
             assert separated
-
-    # Visualize the solution
-    from visualization_utils import visualize_solution
-    visualize_solution(0, container, boxes, perms_list, orient, x, y, z, solver, n)
 
 def test_can_fit_geometrically_3():
     from model_setup import setup_3d_bin_packing_model

@@ -13,6 +13,12 @@ def run(data, output_filename):
 
     container_volume = data['container']['size'][0] * data['container']['size'][1] * data['container']['size'][2]   
     container_weight = data['container']['weight']
+    
+    # Validate container dimensions
+    if container_volume <= 0:
+        raise ValueError(f"Invalid container volume: {container_volume}. Container dimensions: {data['container']['size']}")
+    if container_weight <= 0:
+        raise ValueError(f"Invalid container weight: {container_weight}")
     item_ids = [item.get('id', i+1) for i, item in enumerate(data['items'])]
     item_volumes = [item['size'][0] * item['size'][1] * item['size'][2] for item in data['items']]
     item_weights = [item['weight'] for item in data['items']]
@@ -254,7 +260,7 @@ def run(data, output_filename):
                 continue
             print(f'Running step 2 for container {container["id"]} with {len(boxes)} boxes...')     
 
-            status_str2 = run_phase_2(container["id"],data['container']['size'], boxes, step_2_settings_file, verbose=True, visualize=True)    
+            status_str2, _, _ = run_phase_2(container["id"],data['container']['size'], boxes, step_2_settings_file, verbose=True, visualize=True)    
             if( status_str2 != 'OPTIMAL' and status_str2 != 'FEASIBLE'):
                 print(f'Step 2 failed for container {container["id"]}: {status_str2}')
                 input("Press any key to continue loop ...")

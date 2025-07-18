@@ -18,7 +18,7 @@ def run_phase_2(container_id, container, boxes, settingsfile, verbose=True, visu
     prefer_large_base_lower_non_linear_weight = data.get('prefer_large_base_lower_non_linear_weight', 0)  # default 0
     prefer_put_boxes_by_volume_lower_z_weight = data.get('prefer_put_boxes_by_volume_lower_z_weight', 0)  # default 0
 
-    status, placements, vis_data = run_inner(
+    status_str, placements, vis_data = run_inner(
         container_id, container, boxes, symmetry_mode, max_time_in_seconds, anchor_mode,
         prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight,
         prefer_maximize_surface_contact_weight,
@@ -28,7 +28,7 @@ def run_phase_2(container_id, container, boxes, settingsfile, verbose=True, visu
         prefer_put_boxes_by_volume_lower_z_weight,
         verbose,
         visualize)
-    return status, placements, vis_data
+    return status_str, placements, vis_data
 
 def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mode, \
     prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight, \

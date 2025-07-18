@@ -12,6 +12,10 @@ def dump_phase1_results(
     item_volumes = [item['size'][0] * item['size'][1] * item['size'][2] for item in items]
     item_group_ids = [item.get('group_id') for item in items]
     container_volume = container_size[0] * container_size[1] * container_size[2]
+    if container_volume <= 0:
+        raise ValueError(f"Invalid container volume: {container_volume}. Container dimensions: {container_size}")
+    if container_weight <= 0:
+        raise ValueError(f"Invalid container weight: {container_weight}")
     max_containers = len(y)
     from ortools.sat.python import cp_model
     status_dict = {
@@ -127,6 +131,8 @@ class ContainerLoadingSolution:
         self.soft_scores = []
         self.visualization_data = []
         container_volume = self.container_size[0] * self.container_size[1] * self.container_size[2]
+        if container_volume <= 0:
+            raise ValueError(f"Invalid container volume: {container_volume}. Container dimensions: {self.container_size}")
         for container in self.assignment:
             print(f'**** Running phase 2 for container {container["id"]} with size {self.container_size}')
             boxes = container.get('boxes', [])
@@ -357,7 +363,7 @@ def run_alns(
         else:
             no_improve_count += 1
         current_solution = copy.deepcopy(new_solution) if accepted else current_solution
-        print('***** END OF ALNS LOOP *****')
+        print('***** END OF ONE ALNS LOOP *****')
     print(f'ALNS finished. Best aggregate_score={best_score}, statuses={best_solution.statuses}')
 
     # --- Visualization of best solution ---
