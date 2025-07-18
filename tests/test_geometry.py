@@ -102,7 +102,8 @@ def test_can_fit_geometrically_1():
     status = solver.Solve(model)
     # Should be optimal/feasible: all 4 boxes can fit with rotation
     #assert status in (cp_model.OPTIMAL, cp_model.FEASIBLE)
-    print(f'Solver status: {status_dict.get(status, status)}')
+    status_str = status_dict.get(status, status)
+    print(f'Solver status: {status_str}')
     assert status == cp_model.OPTIMAL
     # Check that all boxes are placed inside the container and do not overlap, and that orientation is valid
     positions = set()
@@ -137,7 +138,7 @@ def test_can_fit_geometrically_1():
 
     # Visualize the solution
     from visualization_utils import visualize_solution
-    visualize_solution(0, container, boxes, perms_list, orient, x, y, z, solver, n)
+    visualize_solution(0, container, boxes, perms_list, orient, x, y, z, solver, n, status_str=status_str)
 
 def test_can_fit_geometrically_2():
     from model_setup import setup_3d_bin_packing_model
@@ -153,7 +154,8 @@ def test_can_fit_geometrically_2():
     solver = cp_model.CpSolver()
     status = solver.Solve(model)
     # Should be optimal/feasible: all 4 boxes can fit with rotation
-    print(f'Solver status: {status_dict.get(status, status)}')
+    status_str = status_dict.get(status, status)
+    print(f'Solver status: {status_str}')
     assert status in (cp_model.OPTIMAL, cp_model.FEASIBLE)
     # Check that all boxes are placed inside the container and do not overlap, and that orientation is valid
     positions = set()
@@ -188,7 +190,7 @@ def test_can_fit_geometrically_2():
 
     # Visualize the solution
     from visualization_utils import visualize_solution
-    visualize_solution(0, container, boxes, perms_list, orient, x, y, z, solver, n)
+    visualize_solution(0, container, boxes, perms_list, orient, x, y, z, solver, n, status_str=status_str)
 
 def test_can_fit_geometrically_3():
     from model_setup import setup_3d_bin_packing_model
@@ -210,7 +212,8 @@ def test_can_fit_geometrically_3():
     add_inside_container_constraint(model, n, x, y, z, l_eff, w_eff, h_eff, container)
     solver = cp_model.CpSolver()
     status = solver.Solve(model)
-    print(f'Solver status: {status_dict.get(status, status)}')    
+    status_str = status_dict.get(status, status)
+    print(f'Solver status: {status_str}')
     # Should be optimal/feasible: all 4 boxes can fit with rotation
     assert status == cp_model.OPTIMAL
     # Check that all boxes are placed inside the container and do not overlap, and that orientation is valid
@@ -246,5 +249,5 @@ def test_can_fit_geometrically_3():
 
     # Visualize the solution
     from visualization_utils import visualize_solution
-    visualize_solution(0, container, boxes, perms_list, orient, x, y, z, solver, n)
+    visualize_solution(0, container, boxes, perms_list, orient, x, y, z, solver, n, status_str=status_str)
 
