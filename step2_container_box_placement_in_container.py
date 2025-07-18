@@ -18,7 +18,7 @@ def run_phase_2(container_id, container, boxes, settingsfile, verbose=True, visu
     prefer_large_base_lower_non_linear_weight = data.get('prefer_large_base_lower_non_linear_weight', 0)  # default 0
     prefer_put_boxes_by_volume_lower_z_weight = data.get('prefer_put_boxes_by_volume_lower_z_weight', 0)  # default 0
 
-    return run_inner(
+    status, placements, vis_data = run_inner(
         container_id, container, boxes, symmetry_mode, max_time_in_seconds, anchor_mode,
         prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight,
         prefer_maximize_surface_contact_weight,
@@ -28,6 +28,7 @@ def run_phase_2(container_id, container, boxes, settingsfile, verbose=True, visu
         prefer_put_boxes_by_volume_lower_z_weight,
         verbose,
         visualize)
+    return status, placements, vis_data
 
 def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mode, \
     prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight, \
@@ -173,11 +174,23 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
 
         if visualize:
             from visualization_utils import visualize_solution
-            plt = visualize_solution(elapsed_time,container, boxes, perms_list, orient, x, y, z, solver, n, status_str, container_id)
+            plt = visualize_solution(elapsed_time, container, boxes, perms_list, placements, n, status_str, container_id)
             plt.show(block=False)
     else:
         print('No solution found.')
-    return status_str, placements
+
+    # Always return visualization info as a dict
+    vis_data = {
+        'elapsed_time': elapsed_time,
+        'container': container,
+        'boxes': boxes,
+        'perms_list': perms_list,
+        'placements': placements,
+        'n': n,
+        'status_str': status_str,
+        'container_id': container_id
+    }
+    return status_str, placements, vis_data
 
 
 

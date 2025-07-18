@@ -1,4 +1,7 @@
-def visualize_solution(time_taken,container, boxes, perms_list, orient, x, y, z, solver, n, status_str=None, container_id=None):
+def visualize_solution(time_taken, container, boxes, perms_list, placements, n, status_str=None, container_id=None):
+    """
+    placements: list of dicts with keys 'position', 'orientation', 'size', etc. (as returned by run_inner)
+    """
     try:
         import matplotlib.pyplot as plt
         from mpl_toolkits.mplot3d.art3d import Poly3DCollection
@@ -23,12 +26,10 @@ def visualize_solution(time_taken,container, boxes, perms_list, orient, x, y, z,
     import random
     colors = plt.cm.get_cmap('tab20', n)
     for i in range(n):
-        xi = solver.Value(x[i])
-        yi = solver.Value(y[i])
-        zi = solver.Value(z[i])
-        orient_val = [solver.Value(orient[i][k]) for k in range(len(orient[i]))]
-        orient_idx = orient_val.index(1)
-        l, w, h = perms_list[i][orient_idx]
+        placement = placements[i]
+        xi, yi, zi = placement['position']
+        orient_idx = placement['orientation']
+        l, w, h = placement['size']
         # Vertices of the box
         verts = [
             [xi, yi, zi],

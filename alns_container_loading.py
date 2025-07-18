@@ -115,14 +115,17 @@ class ContainerLoadingSolution:
         self.statuses = []  # 'OPTIMAL', 'FEASIBLE', 'UNFEASIBLE' per container
         self.soft_scores = []  # soft objective scores per container (to be filled)
         self.aggregate_score = None
+        self.visualization_data = []  # store visualization info per container
 
     def evaluate(self,verbose=True):
         """
         For each container, run step 2 and collect status and soft objective score.
         Also update each box in the assignment with its actual orientation and position.
+        Store visualization info for each container.
         """
         self.statuses = []
         self.soft_scores = []
+        self.visualization_data = []
         container_volume = self.container_size[0] * self.container_size[1] * self.container_size[2]
         for container in self.assignment:
             print(f'**** Running phase 2 for container {container["id"]} with size {self.container_size}')
@@ -130,11 +133,13 @@ class ContainerLoadingSolution:
             if not boxes:
                 self.statuses.append('UNFEASIBLE')
                 self.soft_scores.append(1)  # worst utilization
+                self.visualization_data.append(None)
                 continue
-            # Run step 2 placement and get placements
-            status, placements = run_phase_2(container['id'], self.container_size, boxes, self.step2_settings_file,verbose,False)
+            # Run step 2 placement and get placements and visualization info
+            status, placements, vis_data = run_phase_2(container['id'], self.container_size, boxes, self.step2_settings_file,verbose,False)
             print(f'Completed run of phase 2 for container {container["id"]} with size {self.container_size}')
             self.statuses.append(status)
+            self.visualization_data.append(vis_data)
             # Update each box in container['boxes'] with its actual orientation and position
             # placements is a list of dicts with 'id', 'position', 'orientation', 'size', ...
             placement_map = {p['id']: p for p in placements}
@@ -354,6 +359,26 @@ def run_alns(
         current_solution = copy.deepcopy(new_solution) if accepted else current_solution
         print('***** END OF ALNS LOOP *****')
     print(f'ALNS finished. Best aggregate_score={best_score}, statuses={best_solution.statuses}')
+
+    # --- Visualization of best solution ---
+    try:
+        from visualization_utils import visualize_solution
+        for vis_data in getattr(best_solution, 'visualization_data', []):
+            if vis_data is not None:
+                plt = visualize_solution(
+                    vis_data['elapsed_time'],
+                    vis_data['container'],
+                    vis_data['boxes'],
+                    vis_data['perms_list'],
+                    vis_data['placements'],
+                    vis_data['n'],
+                    vis_data['status_str'],
+                    vis_data['container_id']
+                )
+                plt.show(block=False)
+    except Exception as e:
+        print(f"Visualization failed: {e}")
+
     return best_solution, history
 
 # --- Example main entry point ---

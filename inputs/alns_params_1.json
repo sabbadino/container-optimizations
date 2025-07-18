@@ -2,5 +2,5 @@
     "num_iterations": 100,
     "num_can_be_moved_percentage": 30,
     "time_limit": 120.0,
-    "max_no_improve": 10
+    "max_no_improve": 2
 }
