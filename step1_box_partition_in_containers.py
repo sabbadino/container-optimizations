@@ -6,7 +6,7 @@ import datetime
 from assignment_model import build_assignment_model
 from step2_container_box_placement_in_container import run as step2_run
 
-def run(data):
+def run(data, output_filename):
     # Read rotation property (default to 'free' if not present)
     #rotation = data.get('rotation', 'free')
 
@@ -67,7 +67,7 @@ def run(data):
             if all(box_size[d] <= container_size[d] for d in range(3)):
                 fits = True
         if not fits:
-            raise ValueError("Item {} with size {} does not fit in container of size {} (rotation={})".format(item_ids[i], box_size, container_size, rotation))
+            raise ValueError("Item {} with size {} does not fit in container of size {} (rotation={})".format(item_ids[i], box_size, container_size, item_rotations[i]))
 
 
 
@@ -238,10 +238,10 @@ def run(data):
 
     # Write JSON file
 
-    with open(ouput_filename, 'w', encoding='utf-8') as fjson:
+    with open(output_filename, 'w', encoding='utf-8') as fjson:
         import json as _json
         _json.dump(output_json, fjson, indent=2)
-    print(f'JSON results also written to {ouput_filename}')
+    print(f'JSON results also written to {output_filename}')
 
     # Run step 2: box placement in containers
     if step_2_settings_file is None:
@@ -267,9 +267,9 @@ if __name__ == "__main__":
         print('Usage: python container_bin_packing.py <input_json_file> <output_json_file>')
         sys.exit(1)
     input_filename = sys.argv[1]
-    ouput_filename = sys.argv[2]
+    output_filename = sys.argv[2]
     # Read input data from JSON file
 
     with open(input_filename, 'r') as f:
         data = json.load(f)
-        run(data)
+        run(data, output_filename)
