@@ -174,7 +174,7 @@ class ContainerLoadingSolution:
     def is_feasible(self):
         return 'UNFEASIBLE' not in self.statuses
 
-
+ 
 def acceptance_criteria(new_solution, current_best_score):
     """
     Accept if all containers are at least FEASIBLE and aggregate score improves.
@@ -389,19 +389,122 @@ def run_alns(
 
 # --- Example main entry point ---
 if __name__ == "__main__":
-    import sys, json, time
+    import sys, json, time, os
+    
     if len(sys.argv) < 2:
         print('Usage: python alns_container_loading.py <input_json_file>')
         sys.exit(1)
+    
     input_filename = sys.argv[1]
-    print (f'Reading input from {input_filename}')
-    with open(input_filename, 'r') as f:
-        data = json.load(f)
-    container_size = data['container']['size']
-    container_weight = data['container']['weight']
+    
+    # Validate input file exists
+    if not os.path.exists(input_filename):
+        print(f'Error: Input file "{input_filename}" does not exist.')
+        sys.exit(1)
+    
+    # Validate input file is readable
+    if not os.access(input_filename, os.R_OK):
+        print(f'Error: Input file "{input_filename}" is not readable.')
+        sys.exit(1)
+    
+    print(f'Reading input from {input_filename}')
+    
+    try:
+        with open(input_filename, 'r') as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        print(f'Error: Invalid JSON in input file "{input_filename}": {e}')
+        sys.exit(1)
+    except IOError as e:
+        print(f'Error: Failed to read input file "{input_filename}": {e}')
+        sys.exit(1)
+    
+    # Validate required data structure
+    try:
+        # Validate container data
+        if 'container' not in data:
+            print('Error: Missing "container" key in input JSON.')
+            sys.exit(1)
+        
+        container_size = data['container']['size']
+        container_weight = data['container']['weight']
+        
+        # Validate container dimensions
+        if not isinstance(container_size, list) or len(container_size) != 3:
+            print('Error: Container size must be a list of 3 dimensions [L, W, H].')
+            sys.exit(1)
+        
+        if not all(isinstance(dim, (int, float)) and dim > 0 for dim in container_size):
+            print('Error: Container dimensions must be positive numbers.')
+            sys.exit(1)
+            
+        if not isinstance(container_weight, (int, float)) or container_weight <= 0:
+            print('Error: Container weight must be a positive number.')
+            sys.exit(1)
+        
+        # Validate items data
+        if 'items' not in data:
+            print('Error: Missing "items" key in input JSON.')
+            sys.exit(1)
+            
+        if not isinstance(data['items'], list) or len(data['items']) == 0:
+            print('Error: Items must be a non-empty list.')
+            sys.exit(1)
+        
+        # Validate each item
+        for i, item in enumerate(data['items']):
+            if not isinstance(item, dict):
+                print(f'Error: Item {i} must be a dictionary.')
+                sys.exit(1)
+            
+            required_keys = ['size', 'weight']
+            for key in required_keys:
+                if key not in item:
+                    print(f'Error: Item {i} missing required key "{key}".')
+                    sys.exit(1)
+            
+            if not isinstance(item['size'], list) or len(item['size']) != 3:
+                print(f'Error: Item {i} size must be a list of 3 dimensions [L, W, H].')
+                sys.exit(1)
+                
+            if not all(isinstance(dim, (int, float)) and dim > 0 for dim in item['size']):
+                print(f'Error: Item {i} dimensions must be positive numbers.')
+                sys.exit(1)
+                
+            if not isinstance(item['weight'], (int, float)) or item['weight'] <= 0:
+                print(f'Error: Item {i} weight must be a positive number.')
+                sys.exit(1)
+    
+    except KeyError as e:
+        print(f'Error: Missing required key in input JSON: {e}')
+        sys.exit(1)
+    except Exception as e:
+        print(f'Error: Invalid data structure in input JSON: {e}')
+        sys.exit(1)
+    
+    # Validate step2_settings_file
     step2_settings_file = data.get('step2_settings_file', None)
     if step2_settings_file is None:
         print('Error: step2_settings_file must be specified in the input JSON file.')
+        sys.exit(1)
+    
+    if not os.path.exists(step2_settings_file):
+        print(f'Error: Step2 settings file "{step2_settings_file}" does not exist.')
+        sys.exit(1)
+    
+    if not os.access(step2_settings_file, os.R_OK):
+        print(f'Error: Step2 settings file "{step2_settings_file}" is not readable.')
+        sys.exit(1)
+    
+    # Validate step2 settings file is valid JSON
+    try:
+        with open(step2_settings_file, 'r') as f:
+            step2_data = json.load(f)
+    except json.JSONDecodeError as e:
+        print(f'Error: Invalid JSON in step2 settings file "{step2_settings_file}": {e}')
+        sys.exit(1)
+    except IOError as e:
+        print(f'Error: Failed to read step2 settings file "{step2_settings_file}": {e}')
         sys.exit(1)
     items = []
     item_ids = [item.get('id', i+1) for i, item in enumerate(data['items'])]
@@ -468,12 +571,53 @@ if __name__ == "__main__":
             'boxes': [items[i] for i in items_in_container]
         }
         initial_assignment.append(container_entry)
-    # Read ALNS parameters from input file
+    # Validate ALNS parameters
     alns_params = data.get('alns_params', {})
-    num_iterations = alns_params['num_iterations']
-    num_remove = alns_params['num_remove']
-    time_limit = alns_params['time_limit']
-    max_no_improve = alns_params['max_no_improve']
+    if not isinstance(alns_params, dict):
+        print('Error: alns_params must be a dictionary.')
+        sys.exit(1)
+    
+    required_alns_keys = ['num_iterations', 'num_remove', 'time_limit', 'max_no_improve']
+    for key in required_alns_keys:
+        if key not in alns_params:
+            print(f'Error: Missing required ALNS parameter "{key}".')
+            sys.exit(1)
+    
+    try:
+        num_iterations = alns_params['num_iterations']
+        num_remove = alns_params['num_remove']
+        time_limit = alns_params['time_limit']
+        max_no_improve = alns_params['max_no_improve']
+        
+        # Validate ALNS parameter values
+        if not isinstance(num_iterations, int) or num_iterations <= 0:
+            print('Error: num_iterations must be a positive integer.')
+            sys.exit(1)
+            
+        if not isinstance(num_remove, int) or num_remove <= 0:
+            print('Error: num_remove must be a positive integer.')
+            sys.exit(1)
+            
+        if not isinstance(time_limit, (int, float)) or time_limit <= 0:
+            print('Error: time_limit must be a positive number.')
+            sys.exit(1)
+            
+        if not isinstance(max_no_improve, int) or max_no_improve <= 0:
+            print('Error: max_no_improve must be a positive integer.')
+            sys.exit(1)
+            
+    except Exception as e:
+        print(f'Error: Invalid ALNS parameter values: {e}')
+        sys.exit(1)
+    
+    # Ensure outputs directory exists
+    if not os.path.exists('outputs'):
+        try:
+            os.makedirs('outputs')
+            print('Created outputs directory.')
+        except Exception as e:
+            print(f'Error: Failed to create outputs directory: {e}')
+            sys.exit(1)
     # Run ALNS
     print('calling ALNS loop...')
     best_solution, history = run_alns(
