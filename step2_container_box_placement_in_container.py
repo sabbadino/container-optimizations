@@ -40,7 +40,7 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
     prefer_large_base_lower_non_linear_weight, \
     prefer_put_boxes_by_volume_lower_z_weight, \
     log_search_progress, \
-    verbose=True, visualize=True ):
+    verbose=False, visualize=True ):
 
     if verbose:
         print(f'symmetry_mode:  {symmetry_mode}')
@@ -56,8 +56,10 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
     # override rotation if box is a cube
     for i, item in enumerate(boxes):
         if item['size'][0] == item['size'][1] == item['size'][2] and item.get('rotation') != 'fixed' :
-            if verbose:
-                print(f"\033[90mItem {i} is a cube, setting rotation from {item['rotation']} to 'fixed'\033[0m")
+            # Store original rotation type before overriding
+            item['original_rotation'] = item.get('rotation', 'free')
+            #if verbose:
+             #   print(f"\033[90mItem {i} is a cube, setting rotation from {item['rotation']} to 'fixed'\033[0m")
             item['rotation'] = 'fixed'
 
 
@@ -169,14 +171,26 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
             orient_idx = orient_val.index(1) if 1 in orient_val else None
             l, w, h = perms_list[i][orient_idx] if orient_idx is not None else (None, None, None)
             pos = (solver.Value(x[i]), solver.Value(y[i]), solver.Value(z[i])) if orient_idx is not None else (None, None, None)
+            
+            # Get rotation info
+            current_rotation = boxes[i].get('rotation', 'free')
+            original_rotation = boxes[i].get('original_rotation', current_rotation)
+            
             placements.append({
                 'id': boxes[i].get('id'),
                 'position': pos,
                 'orientation': orient_idx,
                 'size': (l, w, h),
-                'rotation_type': boxes[i].get('rotation', 'free')
+                'rotation_type': current_rotation,
+                'original_rotation_type': original_rotation
             })
-            print(f'BoxId {boxes[i].get("id")}: pos={pos}, size=({l}, {w}, {h}), orientation={orient_idx}, rotation_type={boxes[i].get("rotation", "free")})')
+            
+            # Show both original and current rotation if they differ
+            rotation_info = f"rotation_type={current_rotation}"
+            if original_rotation != current_rotation:
+                rotation_info += f" (originally={original_rotation})"
+            
+            print(f'BoxId {boxes[i].get("id")}: pos={pos}, size=({l}, {w}, {h}), orientation={orient_idx}, {rotation_info}')
 
         if visualize:
             from visualization_utils import visualize_solution

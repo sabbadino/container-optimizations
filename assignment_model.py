@@ -9,12 +9,14 @@ def build_step1_assignment_model(items, container_size, container_weight, max_co
         print('INPUTS')
         print(f'Container volume capacity: {container_size[0] * container_size[1] * container_size[2]}')
         print(f'Container weight capacity: {container_weight}')
+        print(f'number of items: {len(items)}')
         print('Item details:')
         for i, item in enumerate(items):
             volume = item['size'][0] * item['size'][1] * item['size'][2]
             rotation = item.get('rotation', None)
             group_id = item.get('group_id', None)
-            print(f'  Item {item["id"]}: weight={item["weight"]}, volume={volume}, rotation={rotation}, group_id={group_id}')
+            print(f'Counter {i} Item id {item["id"]}: weight={item["weight"]}, volume={volume}, rotation={rotation}, group_id={group_id}')
+        print(f'total weight: {sum(item["weight"] for item in items)} total volume: {sum(item["size"][0] * item["size"][1] * item["size"][2] for item in items)}')
         print('****************')
     """
     items: list of item dicts (must have 'id', 'size', 'weight', optional 'group_id')

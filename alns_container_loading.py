@@ -42,32 +42,44 @@ def dump_phase1_results(
         output_md.append('')
         used_container_indices = [j for j in range(max_containers) if solver.Value(y[j])]
         container_rebase = {old_idx: new_idx+1 for new_idx, old_idx in enumerate(used_container_indices)}
+ 
+        total_boxes_weight_check = sum(item_weights[i] for j in used_container_indices for i in range(num_items) if solver.Value(x[i, j]))  
+        total_boxes_volume_check = sum(item_volumes[i] for j in used_container_indices for i in range(num_items) if solver.Value(x[i, j]))
+        total_container_boxes=0;
+ 
         for old_j in used_container_indices:
             new_j = container_rebase[old_j]
             items_in_container = [i for i in range(num_items) if solver.Value(x[i, old_j])]
             total_weight = sum(item_weights[i] for i in items_in_container)
             total_volume = sum(item_volumes[i] for i in items_in_container)
+            container_boxes = [items[i] for i in items_in_container]
+            total_container_boxes += len(container_boxes)
             pct_weight = 100 * total_weight / container_weight if container_weight > 0 else 0
             pct_volume = 100 * total_volume / container_volume if container_volume > 0 else 0
-            print('')
-            print(f'### Container {new_j}')
-            print('| Item id | Weight | Volume | Group id |')
+            #print('')
+            #print(f'### Container {new_j}')
+            #print('| Item id | Weight | Volume | Group id |')
             
             output_md.append(f'### Container {new_j}')
             output_md.append('| Item id | Weight | Volume | Group id |')
             output_md.append('|---------|--------|--------|----------|')
             for i in items_in_container:
                 output_md.append(f'| {item_ids[i]} | {item_weights[i]} | {item_volumes[i]} | {item_group_ids[i]} |')
-                print(f'| {item_ids[i]} | {item_weights[i]} | {item_volumes[i]} | {item_group_ids[i]} |')
+                #print(f'| {item_ids[i]} | {item_weights[i]} | {item_volumes[i]} | {item_group_ids[i]} |')
             output_md.append(f'**Total for container {new_j}: weight = {total_weight} ({pct_weight:.1f}% of max), volume = {total_volume} ({pct_volume:.1f}% of max)**\n')
             print(f'**Total for container {new_j}: weight = {total_weight} ({pct_weight:.1f}% of max), volume = {total_volume} ({pct_volume:.1f}% of max)**')
+        
+        print(f'Total boxes weight check: {total_boxes_weight_check}')
+        print(f'Total boxes volume check: {total_boxes_volume_check}')    
+        print(f'Total container boxes: {total_container_boxes}')            
+        
         if group_ids:
-            print('')
-            print('### Group Splits')
+           # print('')
+            #print('### Group Splits')
             output_md.append('### Group Splits')
-            print('| Group id | Containers used | Splits (penalized) | Container numbers |')
+          #  print('| Group id | Containers used | Splits (penalized) | Container numbers |')
             output_md.append('| Group id | Containers used | Splits (penalized) | Container numbers |')
-            print('|----------|----------------|--------------------|-------------------|')
+          #  print('|----------|----------------|--------------------|-------------------|')
             output_md.append('|----------|----------------|--------------------|-------------------|')
             for g in group_ids:
                 containers_for_group = []
@@ -76,9 +88,9 @@ def dump_phase1_results(
                         containers_for_group.append(str(container_rebase[old_j]))
                 containers_str = ', '.join(containers_for_group)
                 output_md.append(f'| {g} | {solver.Value(group_in_containers[g])} | {group_splits[g]} | {containers_str} |')
-                print(f'| {g} | {solver.Value(group_in_containers[g])} | {group_splits[g]} | {containers_str} |')
+                #print(f'| {g} | {solver.Value(group_in_containers[g])} | {group_splits[g]} | {containers_str} |')
             output_md.append('')
-            print('')
+           # print('')
     else:
         print('No solution found.')
         output_md.append('No solution found.')
@@ -121,7 +133,7 @@ class ContainerLoadingSolution:
         self.aggregate_score = None
         self.visualization_data = []  # store visualization info per container
 
-    def evaluate(self,verbose=True):
+    def evaluate(self,verbose=False):
         """
         For each container, run step 2 and collect status and soft objective score.
         Also update each box in the assignment with its actual orientation and position.
@@ -155,20 +167,43 @@ class ContainerLoadingSolution:
                     box['final_position'] = p['position']
                     box['final_orientation'] = p['orientation']
                     box['final_size'] = p['size']
-            # Phase 1 soft score: 1 - volume utilization
-            total_box_volume = sum(box['size'][0] * box['size'][1] * box['size'][2] for box in boxes)
-            volume_utilization = total_box_volume / container_volume if container_volume > 0 else 0
+            # Soft score: 1 - volume utilization (per container, for variance calculation)
+            # Note: Individual scores will be used to calculate variance of utilization across containers
+            # Use placements data to get the actual volume utilization after step 2 optimization
+            if status in ['OPTIMAL', 'FEASIBLE'] and placements:
+                # Calculate total volume of successfully placed boxes using their actual sizes from placements
+                total_placed_volume = sum(p['size'][0] * p['size'][1] * p['size'][2] for p in placements)
+                volume_utilization = total_placed_volume / container_volume if container_volume > 0 else 0
+            else:
+                # If step 2 failed, use original box volumes as fallback (worst case)
+                total_box_volume = sum(box['size'][0] * box['size'][1] * box['size'][2] for box in boxes)
+                volume_utilization = total_box_volume / container_volume if container_volume > 0 else 0
+            
             score = 1 - volume_utilization  # lower is better
             self.soft_scores.append(score)
-            print(f'Container {container["id"]}: status={status}, volume_utilization={volume_utilization:.2f}, soft_score={score:.2f}, n_boxes={len(boxes)}')
-        # Aggregate score: penalize UNFEASIBLE, subtract soft_scores so lower is better
+            print(f'Container {container["id"]}: status={status}, volume_utilization={volume_utilization:.3f}, soft_score={score:.3f}, n_boxes={len(boxes)}, n_placements={len(placements) if placements else 0}')
+        # NEW SOFT SCORE: Minimize variance of container utilization percentages
+        # This rewards balanced loading across containers (lower variance = better balance)
+        if self.soft_scores:  # Only if we have containers
+            utilization_percentages = [(1 - score) * 100 for score in self.soft_scores]  # Convert back to percentages
+            mean_utilization = sum(utilization_percentages) / len(utilization_percentages)
+            variance = sum((util - mean_utilization) ** 2 for util in utilization_percentages) / len(utilization_percentages)
+            balance_penalty = variance / 100  # Normalize variance (0-100 range becomes 0-1)
+        else:
+            balance_penalty = 0
+            variance = 0
+            mean_utilization = 0
+        
+        # Aggregate score: penalize UNFEASIBLE, add balance penalty, subtract bonuses
         penalty = 1000 * self.statuses.count('UNFEASIBLE')
         optimal_bonus = 2 * self.statuses.count('OPTIMAL')
         feasible_bonus = 1 * self.statuses.count('FEASIBLE')
-        self.aggregate_score = penalty - optimal_bonus - feasible_bonus - sum(self.soft_scores)
+        self.aggregate_score = penalty + balance_penalty - optimal_bonus - feasible_bonus
+        
         # Print in blue color using ANSI escape code
         print('')
-        print(f'\033[94mAggregate score: {self.aggregate_score} (equal to penalty={penalty} - optimal_bonus={optimal_bonus} - feasible_bonus={feasible_bonus} - soft_scores={sum(self.soft_scores)})\033[0m')
+        print(f'\033[94mAggregate score: {self.aggregate_score} (penalty={penalty} + balance_penalty={balance_penalty:.3f} - optimal_bonus={optimal_bonus} - feasible_bonus={feasible_bonus})\033[0m')
+        print(f'\033[94mUtilization stats: mean={mean_utilization:.1f}%, variance={variance:.1f}, percentages={[f"{p:.1f}%" for p in utilization_percentages]}\033[0m')
         return self.aggregate_score
 
     def is_feasible(self):
@@ -204,21 +239,31 @@ def destroy_random_items(solution, num_remove=5):
     Returns a new partial assignment (list of containers with boxes, some boxes removed).
     """
     import numpy as np
+    
     # Flatten all boxes with their container index
     all_boxes = [(c_idx, box_idx) for c_idx, container in enumerate(solution.assignment)
                  for box_idx in range(len(container['boxes']))]
     if len(all_boxes) == 0:
         return copy.deepcopy(solution.assignment), []
+    
     remove_indices = np.random.choice(len(all_boxes), min(num_remove, len(all_boxes)), replace=False)
     removed_items = []
     new_assignment = copy.deepcopy(solution.assignment)
+    
+    # Collect removed items first (before marking for removal)
     for idx in remove_indices:
         c_idx, box_idx = all_boxes[idx]
         removed_items.append(new_assignment[c_idx]['boxes'][box_idx])
+    
+    # Now mark for removal
+    for idx in remove_indices:
+        c_idx, box_idx = all_boxes[idx]
         new_assignment[c_idx]['boxes'][box_idx] = None  # Mark for removal
+    
     # Remove None entries
     for container in new_assignment:
         container['boxes'] = [box for box in container['boxes'] if box is not None]
+    
     return new_assignment, removed_items
 
 
@@ -234,9 +279,22 @@ def repair_cpsat(partial_assignment, removed_items, container_size, container_we
     # Use shared assignment model for consistency
     from assignment_model import build_step1_assignment_model
     import copy
+    
+    # Validate no duplicate item IDs
+    all_item_ids = []
+    for item in removed_items:
+        all_item_ids.append(item['id'])
+    for container in partial_assignment:
+        for box in container['boxes']:
+            all_item_ids.append(box['id'])
+    
+    if len(all_item_ids) != len(set(all_item_ids)):
+        raise ValueError(f"Duplicate item IDs detected in repair_cpsat: {[id for id in all_item_ids if all_item_ids.count(id) > 1]}")
+    
     # Prepare items: combine removed_items and fixed items
     all_items = []
     item_id_to_idx = {}
+    
     # Add removed items first
     for i, item in enumerate(removed_items):
         all_items.append({
@@ -247,6 +305,14 @@ def repair_cpsat(partial_assignment, removed_items, container_size, container_we
             'rotation': item.get('rotation')
         })
         item_id_to_idx[item['id']] = i
+    
+    # Build container mapping: original container id -> zero-based index for CP-SAT
+    container_id_to_cpsat_idx = {}
+    cpsat_idx_to_container_id = {}
+    for cpsat_idx, container in enumerate(partial_assignment):
+        container_id_to_cpsat_idx[container['id']] = cpsat_idx
+        cpsat_idx_to_container_id[cpsat_idx] = container['id']
+    
     # Add fixed items (from partial_assignment)
     fixed_assignments = {}
     fixed_item_ids = set()
@@ -262,7 +328,8 @@ def repair_cpsat(partial_assignment, removed_items, container_size, container_we
                     'rotation': box.get('rotation')
                 })
                 item_id_to_idx[box['id']] = idx
-            fixed_assignments[box['id']] = container['id'] - 1  # zero-based container idx
+            # Use the correct CP-SAT container index
+            fixed_assignments[box['id']] = container_id_to_cpsat_idx[container['id']]
             fixed_item_ids.add(box['id'])
     # Build group_to_items mapping
     from collections import defaultdict
@@ -293,18 +360,24 @@ def repair_cpsat(partial_assignment, removed_items, container_size, container_we
         solver, status, x, y, group_in_containers, group_ids, group_to_items,
         all_items, container_size, container_weight, input_md=None, filename_prefix='alns_repair_result', write_md=False )
     # Build new assignment structure
-    # Start with empty containers
+    # Start with empty containers - use sequential container IDs
     new_assignment = []
-    for j in range(max_containers):
-        if solver.Value(y[j]):
-            new_assignment.append({'id': j+1, 'size': container_size, 'boxes': []})
-    # Assign items to containers
+    used_cpsat_indices = [j for j in range(max_containers) if solver.Value(y[j])]
+    
+    print(f'DEBUG: used CP-SAT container indices: {used_cpsat_indices}')
+    
+    for cpsat_idx in used_cpsat_indices:
+        new_assignment.append({'id': len(new_assignment) + 1, 'size': container_size, 'boxes': []})
+    
+    # Assign items to containers using correct mapping
     for i in range(len(all_items)):
-        for idx, container in enumerate(new_assignment):
-            j = container['id'] - 1
-            if solver.Value(x[i, j]):
-                container['boxes'].append(all_items[i])
+        for cpsat_idx in used_cpsat_indices:
+            if solver.Value(x[i, cpsat_idx]):
+                # Find which new_assignment container corresponds to this cpsat_idx
+                new_container_idx = used_cpsat_indices.index(cpsat_idx)
+                new_assignment[new_container_idx]['boxes'].append(all_items[i])
                 break
+    
     return new_assignment
 
 
@@ -323,7 +396,7 @@ def run_alns(
     print('***** Starting ALNS loop ...')
     print('***** Getting step 2 baseline ...')
     best_solution = ContainerLoadingSolution(initial_assignment, container_size, step2_settings_file)
-    best_score = best_solution.evaluate(True)
+    best_score = best_solution.evaluate(False)
     print(f'Initial step 2 solution: aggregate_score={best_score}, statuses={best_solution.statuses}')
     current_solution = copy.deepcopy(best_solution)
     history = []
@@ -508,6 +581,13 @@ if __name__ == "__main__":
         sys.exit(1)
     items = []
     item_ids = [item.get('id', i+1) for i, item in enumerate(data['items'])]
+    
+    # Validate no duplicate item IDs
+    if len(item_ids) != len(set(item_ids)):
+        duplicate_ids = [id for id in item_ids if item_ids.count(id) > 1]
+        print(f'Error: Duplicate item IDs detected: {duplicate_ids}')
+        print('Each item must have a unique ID. Please fix the input data.')
+        sys.exit(1)
     item_group_ids = [item.get('group_id') for item in data['items']]
     for i in range(len(data['items'])):
         item = {
@@ -540,6 +620,7 @@ if __name__ == "__main__":
     input_md.append('## INPUTS')
     input_md.append(f'- Container volume capacity: {container_size[0] * container_size[1] * container_size[2]}')
     input_md.append(f'- Container weight capacity: {container_weight}')
+    
     input_md.append(f'- Items:')
     input_md.append('')
     input_md.append('| id | weight | volume | rotation | group_id |')
@@ -577,7 +658,7 @@ if __name__ == "__main__":
         print('Error: alns_params must be a dictionary.')
         sys.exit(1)
     
-    required_alns_keys = ['num_iterations', 'num_remove', 'time_limit', 'max_no_improve']
+    required_alns_keys = ['num_iterations', 'num_can_be_moved_percentage', 'time_limit', 'max_no_improve']
     for key in required_alns_keys:
         if key not in alns_params:
             print(f'Error: Missing required ALNS parameter "{key}".')
@@ -585,17 +666,22 @@ if __name__ == "__main__":
     
     try:
         num_iterations = alns_params['num_iterations']
-        num_remove = alns_params['num_remove']
+        num_can_be_moved_percentage = alns_params['num_can_be_moved_percentage']
         time_limit = alns_params['time_limit']
         max_no_improve = alns_params['max_no_improve']
+        
+        # Calculate num_remove based on total items and percentage
+        total_items = len(items)
+        num_remove = max(1, int(total_items * num_can_be_moved_percentage / 100))
+        print(f'Total items: {total_items}, num_can_be_moved_percentage: {num_can_be_moved_percentage}%, calculated num_remove: {num_remove}')
         
         # Validate ALNS parameter values
         if not isinstance(num_iterations, int) or num_iterations <= 0:
             print('Error: num_iterations must be a positive integer.')
             sys.exit(1)
             
-        if not isinstance(num_remove, int) or num_remove <= 0:
-            print('Error: num_remove must be a positive integer.')
+        if not isinstance(num_can_be_moved_percentage, (int, float)) or num_can_be_moved_percentage <= 0 or num_can_be_moved_percentage > 100:
+            print('Error: num_can_be_moved_percentage must be a number between 0 and 100.')
             sys.exit(1)
             
         if not isinstance(time_limit, (int, float)) or time_limit <= 0:
