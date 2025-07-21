@@ -17,6 +17,7 @@ def run_phase_2(container_id, container, boxes, settingsfile, verbose=True, visu
     prefer_total_floor_area_weight = data.get('prefer_total_floor_area_weight', 0)  # default 0 for backward compatibility
     prefer_large_base_lower_non_linear_weight = data.get('prefer_large_base_lower_non_linear_weight', 0)  # default 0
     prefer_put_boxes_by_volume_lower_z_weight = data.get('prefer_put_boxes_by_volume_lower_z_weight', 0)  # default 0
+    log_search_progress = data.get('log_search_progress', False) # default to false
 
     status_str, placements, vis_data = run_inner(
         container_id, container, boxes, symmetry_mode, max_time_in_seconds, anchor_mode,
@@ -26,6 +27,7 @@ def run_phase_2(container_id, container, boxes, settingsfile, verbose=True, visu
         prefer_total_floor_area_weight,
         prefer_large_base_lower_non_linear_weight,
         prefer_put_boxes_by_volume_lower_z_weight,
+        log_search_progress,
         verbose,
         visualize)
     return status_str, placements, vis_data
@@ -36,7 +38,9 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
     prefer_large_base_lower_weight, \
     prefer_total_floor_area_weight, \
     prefer_large_base_lower_non_linear_weight, \
-    prefer_put_boxes_by_volume_lower_z_weight,verbose=True, visualize=True ):
+    prefer_put_boxes_by_volume_lower_z_weight, \
+    log_search_progress, \
+    verbose=True, visualize=True ):
 
     if verbose:
         print(f'symmetry_mode:  {symmetry_mode}')
@@ -47,6 +51,7 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
         print(f'prefer_large_base_lower_weight: {prefer_large_base_lower_weight}')
         print(f'prefer_large_base_lower_non_linear_weight: {prefer_large_base_lower_non_linear_weight}')
         print(f'prefer_put_boxes_by_volume_lower_z_weight: {prefer_put_boxes_by_volume_lower_z_weight}')
+        print(f'log_search_progress: {log_search_progress}')
 
     # override rotation if box is a cube
     for i, item in enumerate(boxes):
@@ -61,7 +66,8 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
     n, x, y, z, perms_list, orient, l_eff, w_eff, h_eff = setup_3d_bin_packing_model(model, container, boxes)
     import time
     solver = cp_model.CpSolver()
-
+    if log_search_progress:
+        solver.parameters.log_search_progress = True
 
 
 
@@ -219,4 +225,3 @@ if __name__ == "__main__":
         prefer_put_boxes_by_volume_lower_z_weight)
     
     input("Press Enter to exit...")  # Keep the window open until user input
-    

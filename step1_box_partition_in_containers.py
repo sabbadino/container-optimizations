@@ -1,5 +1,3 @@
-
-
 import json
 import sys
 import datetime
@@ -110,8 +108,12 @@ def run(data, output_filename):
         group_penalty_lambda=group_penalty_lambda,
         dump_inputs=True    
     )
+    # Solve
     from ortools.sat.python import cp_model
     solver = cp_model.CpSolver()
+    if data.get('log_search_progress', False):
+        solver.parameters.log_search_progress = True
+    solver.parameters.max_time_in_seconds = data.get('max_time_in_seconds', 60.0)
     status = solver.Solve(model)
 
     # Print model status

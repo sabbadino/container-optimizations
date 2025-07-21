@@ -1,6 +1,7 @@
 {
   "symmetry_mode": "simple",
   "max_time_in_seconds": 15,
+  "log_search_progress": false,
   "prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight": 0, 
   "prefer_maximize_surface_contact_weight": 0,
 

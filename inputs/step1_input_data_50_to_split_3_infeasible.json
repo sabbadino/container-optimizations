@@ -1,6 +1,5 @@
 {  "alns_params": {
     "num_iterations": 100,
-    "use_cpsat_repair": true,
     "num_remove": 5,
     "time_limit": 120.0,
     "max_no_improve": 10

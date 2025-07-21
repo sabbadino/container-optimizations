@@ -27,6 +27,7 @@ def build_step1_assignment_model(items, container_size, container_weight, max_co
     Returns: model, x, y, group_in_j, group_in_containers
     """
     model = cp_model.CpModel()
+    
     num_items = len(items)
     # Variables
     x = {}  # x[i, j] = 1 if item i in container j
