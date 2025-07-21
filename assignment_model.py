@@ -4,30 +4,30 @@ Shared CP-SAT assignment model for container loading (step 1 and ALNS repair)
 from ortools.sat.python import cp_model
 
 def build_step1_assignment_model(items, container_size, container_weight, max_containers, group_to_items=None, fixed_assignments=None, group_penalty_lambda=1, dump_inputs=False):
+    """
+        items: list of item dicts (must have 'id', 'size', 'weight', optional 'group_id')
+        container_size: [L, W, H]
+        container_weight: max weight per container
+        max_containers: int, upper bound on containers
+        group_to_items: dict mapping group_id to list of item indices (optional)
+        fixed_assignments: dict {item_id: container_idx} for items to fix (optional)
+        group_penalty_lambda: penalty weight for group splits
+        Returns: model, x, y, group_in_j, group_in_containers
+        """    
     if dump_inputs:
         print('****************')
         print('INPUTS')
         print(f'Container volume capacity: {container_size[0] * container_size[1] * container_size[2]}')
         print(f'Container weight capacity: {container_weight}')
-        print(f'number of items: {len(items)}')
+        print(f'number of items: {len(items)} total weight: {sum(item["weight"] for item in items)} total volume: {sum(item["size"][0] * item["size"][1] * item["size"][2] for item in items)}')
         print('Item details:')
         for i, item in enumerate(items):
             volume = item['size'][0] * item['size'][1] * item['size'][2]
             rotation = item.get('rotation', None)
             group_id = item.get('group_id', None)
             print(f'Counter {i} Item id {item["id"]}: weight={item["weight"]}, volume={volume}, rotation={rotation}, group_id={group_id}')
-        print(f'total weight: {sum(item["weight"] for item in items)} total volume: {sum(item["size"][0] * item["size"][1] * item["size"][2] for item in items)}')
         print('****************')
-    """
-    items: list of item dicts (must have 'id', 'size', 'weight', optional 'group_id')
-    container_size: [L, W, H]
-    container_weight: max weight per container
-    max_containers: int, upper bound on containers
-    group_to_items: dict mapping group_id to list of item indices (optional)
-    fixed_assignments: dict {item_id: container_idx} for items to fix (optional)
-    group_penalty_lambda: penalty weight for group splits
-    Returns: model, x, y, group_in_j, group_in_containers
-    """
+    
     model = cp_model.CpModel()
     
     num_items = len(items)

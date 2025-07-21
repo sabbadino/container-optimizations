@@ -1,122 +1,10 @@
-# --- Utility: Dump Phase 1 Model Results ---
-def dump_phase1_results(
-    solver, status, x, y, group_in_containers, group_ids, group_to_items,
-    items, container_size, container_weight, input_md=None, filename_prefix='container_bin_packing_result', write_md=True):
-    """
-    Print and write markdown summary of phase 1 assignment model results.
-    """
-    import sys, datetime, os
-    num_items = len(items)
-    item_ids = [item.get('id', i+1) for i, item in enumerate(items)]
-    item_weights = [item['weight'] for item in items]
-    item_volumes = [item['size'][0] * item['size'][1] * item['size'][2] for item in items]
-    item_group_ids = [item.get('group_id') for item in items]
-    container_volume = container_size[0] * container_size[1] * container_size[2]
-    if container_volume <= 0:
-        raise ValueError(f"Invalid container volume: {container_volume}. Container dimensions: {container_size}")
-    if container_weight <= 0:
-        raise ValueError(f"Invalid container weight: {container_weight}")
-    max_containers = len(y)
-    from ortools.sat.python import cp_model
-    status_dict = {
-        cp_model.OPTIMAL: 'OPTIMAL',
-        cp_model.FEASIBLE: 'FEASIBLE',
-        cp_model.INFEASIBLE: 'INFEASIBLE',
-        cp_model.MODEL_INVALID: 'MODEL_INVALID',
-        cp_model.UNKNOWN: 'UNKNOWN',
-    }
-    output_md = []
-    output_md.append('## OUTPUTS')
-    output_md.append(f'Step 1 Solver status: {status_dict.get(status, status)}')
-    print('')
-    print(f'******** PHASE 1 OUTPUT ********')
-    print(f'Step 1 Solver status: {status_dict.get(status, status)}')
-    if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-        min_containers = int(sum(solver.Value(y[j]) for j in range(max_containers)))
-        group_splits = {g: solver.Value(group_in_containers[g]) - 1 for g in group_ids}
-        total_group_splits = sum(group_splits.values())
-        print(f'Minimum containers used: {min_containers}')
-        print(f'Total group splits (penalized): {total_group_splits}')
-        output_md.append(f'- Minimum containers used: {min_containers}')
-        output_md.append(f'- Total group splits (penalized): {total_group_splits}')
-        output_md.append('')
-        used_container_indices = [j for j in range(max_containers) if solver.Value(y[j])]
-        container_rebase = {old_idx: new_idx+1 for new_idx, old_idx in enumerate(used_container_indices)}
- 
-        total_boxes_weight_check = sum(item_weights[i] for j in used_container_indices for i in range(num_items) if solver.Value(x[i, j]))  
-        total_boxes_volume_check = sum(item_volumes[i] for j in used_container_indices for i in range(num_items) if solver.Value(x[i, j]))
-        total_container_boxes=0;
- 
-        for old_j in used_container_indices:
-            new_j = container_rebase[old_j]
-            items_in_container = [i for i in range(num_items) if solver.Value(x[i, old_j])]
-            total_weight = sum(item_weights[i] for i in items_in_container)
-            total_volume = sum(item_volumes[i] for i in items_in_container)
-            container_boxes = [items[i] for i in items_in_container]
-            total_container_boxes += len(container_boxes)
-            pct_weight = 100 * total_weight / container_weight if container_weight > 0 else 0
-            pct_volume = 100 * total_volume / container_volume if container_volume > 0 else 0
-            #print('')
-            #print(f'### Container {new_j}')
-            #print('| Item id | Weight | Volume | Group id |')
-            
-            output_md.append(f'### Container {new_j}')
-            output_md.append('| Item id | Weight | Volume | Group id |')
-            output_md.append('|---------|--------|--------|----------|')
-            for i in items_in_container:
-                output_md.append(f'| {item_ids[i]} | {item_weights[i]} | {item_volumes[i]} | {item_group_ids[i]} |')
-                #print(f'| {item_ids[i]} | {item_weights[i]} | {item_volumes[i]} | {item_group_ids[i]} |')
-            output_md.append(f'**Total for container {new_j}: weight = {total_weight} ({pct_weight:.1f}% of max), volume = {total_volume} ({pct_volume:.1f}% of max)**\n')
-            print(f'**Total for container {new_j}: weight = {total_weight} ({pct_weight:.1f}% of max), volume = {total_volume} ({pct_volume:.1f}% of max)**')
-        
-        print(f'Total boxes weight check: {total_boxes_weight_check}')
-        print(f'Total boxes volume check: {total_boxes_volume_check}')    
-        print(f'Total container boxes: {total_container_boxes}')            
-        
-        if group_ids:
-           # print('')
-            #print('### Group Splits')
-            output_md.append('### Group Splits')
-          #  print('| Group id | Containers used | Splits (penalized) | Container numbers |')
-            output_md.append('| Group id | Containers used | Splits (penalized) | Container numbers |')
-          #  print('|----------|----------------|--------------------|-------------------|')
-            output_md.append('|----------|----------------|--------------------|-------------------|')
-            for g in group_ids:
-                containers_for_group = []
-                for old_j in used_container_indices:
-                    if any(solver.Value(x[i, old_j]) for i in group_to_items[g]):
-                        containers_for_group.append(str(container_rebase[old_j]))
-                containers_str = ', '.join(containers_for_group)
-                output_md.append(f'| {g} | {solver.Value(group_in_containers[g])} | {group_splits[g]} | {containers_str} |')
-                #print(f'| {g} | {solver.Value(group_in_containers[g])} | {group_splits[g]} | {containers_str} |')
-            output_md.append('')
-           # print('')
-    else:
-        print('No solution found.')
-        output_md.append('No solution found.')
-    if write_md:
-        now = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-        md_filename = f'outputs/{filename_prefix}_{now}.md'
-        if input_md is not None:
-            with open(md_filename, 'w', encoding='utf-8') as f:
-                f.write('# Container Bin Packing Result\n\n')
-                f.write('\n'.join(input_md))
-                f.write('\n---\n')
-                f.write('\n'.join(output_md))
-        else:
-            with open(md_filename, 'w', encoding='utf-8') as f:
-                f.write('# Container Bin Packing Result\n\n')
-                f.write('\n'.join(output_md))
-        if sys.platform.startswith('win'):
-            os.startfile(os.path.abspath(md_filename))
-    print(f'********************************')
-
 """
 ALNS framework for container loading: solution evaluation and acceptance criteria template
 """
 import copy
 import random
 from step2_container_box_placement_in_container import run_phase_2 
+from print_utils import dump_phase1_results
 
 class ContainerLoadingSolution:
     def __init__(self, assignment, container_size, step2_settings_file):
@@ -358,7 +246,7 @@ def repair_cpsat(partial_assignment, removed_items, container_size, container_we
     # Dump results for repair
     dump_phase1_results(
         solver, status, x, y, group_in_containers, group_ids, group_to_items,
-        all_items, container_size, container_weight, input_md=None, filename_prefix='alns_repair_result', write_md=False )
+        all_items, container_size, container_weight, verbose=False)
     # Build new assignment structure
     # Start with empty containers - use sequential container IDs
     new_assignment = []
@@ -615,21 +503,6 @@ if __name__ == "__main__":
         fixed_assignments=None,
         group_penalty_lambda=group_penalty_lambda,dump_inputs=True
     )
-    # Prepare input markdown for reporting
-    input_md = []
-    input_md.append('## INPUTS')
-    input_md.append(f'- Container volume capacity: {container_size[0] * container_size[1] * container_size[2]}')
-    input_md.append(f'- Container weight capacity: {container_weight}')
-    
-    input_md.append(f'- Items:')
-    input_md.append('')
-    input_md.append('| id | weight | volume | rotation | group_id |')
-    input_md.append('|----|--------|--------|----------|----------|')
-    for i in range(len(items)):
-        volume = items[i]['size'][0] * items[i]['size'][1] * items[i]['size'][2]
-        rotation = items[i].get('rotation', None)
-        input_md.append(f'| {items[i]["id"]} | {items[i]["weight"]} | {volume} | {rotation} | {items[i].get("group_id", None)} |')
-    input_md.append('')
     from ortools.sat.python import cp_model
     print (f'Running phase 1 baseline.')
     solver = cp_model.CpSolver()
@@ -637,7 +510,7 @@ if __name__ == "__main__":
     # Dump results for initial assignment
     dump_phase1_results(
         solver, status, x, y, group_in_containers, group_ids, group_to_items,
-        items, container_size, container_weight, input_md=input_md, filename_prefix='container_bin_packing_result', write_md=False)
+        items, container_size, container_weight, verbose=False)
 
     # Extract assignment in same format as step1_box_partition_in_containers.py
     initial_assignment = []
