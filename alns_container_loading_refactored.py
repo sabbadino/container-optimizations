@@ -135,7 +135,7 @@ class ContainerLoadingState:
             mean_utilization = 0
         
         # Aggregate score: penalize UNFEASIBLE, add balance penalty, subtract bonuses
-        penalty = 1000 * self.statuses.count('UNFEASIBLE')
+        penalty = 1000 * self.statuses.count('UNFEASIBLE') + 500 * self.statuses.count('UNKNOWN')
         optimal_bonus = 2 * self.statuses.count('OPTIMAL')
         feasible_bonus = 1 * self.statuses.count('FEASIBLE')
         self.aggregate_score = penalty + balance_penalty - optimal_bonus - feasible_bonus
