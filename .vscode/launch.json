@@ -73,8 +73,22 @@
                 "inputs/alns_input_data_50_items_1.json",
             ],
             "console": "integratedTerminal"
-        }
+        },
 
+        {
+            "name": "ALNS MAIN alns_input_data_50_items_1.json",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "args": [
+                "--input",
+                "inputs/alns_input_data_50_items_1.json",
+                "--output",
+                "outputs/alns_out.json",
+                "--verbose"
+            ],
+            "console": "integratedTerminal"
+        }
         
     ]
 }

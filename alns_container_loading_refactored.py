@@ -41,15 +41,19 @@ class ContainerLoadingState:
     Implements the required objective() method for the ALNS library.
     """
     
-    def __init__(self, assignment, container_size, step2_settings_file):
+    def __init__(self, assignment, container_size, container_weight, step2_settings_file, verbose=False):
         """
         assignment: list of containers, each is a dict with 'id', 'boxes' (list of box dicts)
         container_size: [L, W, H]
+        container_weight: max weight for the container
         step2_settings_file: path to settings JSON for step 2
+        verbose: bool, controls solver logging
         """
         self.assignment = copy.deepcopy(assignment)
         self.container_size = container_size
+        self.container_weight = container_weight
         self.step2_settings_file = step2_settings_file
+        self.verbose = verbose
         self.statuses = []  # 'OPTIMAL', 'FEASIBLE', 'UNFEASIBLE' per container
         self.soft_scores = []  # soft objective scores per container (to be filled)
         self.aggregate_score = None
@@ -90,7 +94,7 @@ class ContainerLoadingState:
             # Run step 2 placement and get placements and visualization info
             status, placements, vis_data = run_phase_2(
                 container['id'], self.container_size, boxes, 
-                self.step2_settings_file, verbose, False
+                self.step2_settings_file, self.verbose, False
             )
             print(f'Completed run of phase 2 for container {container["id"]} with size {self.container_size}')
             self.statuses.append(status)
@@ -156,7 +160,10 @@ class ContainerLoadingState:
 
     def copy(self):
         """Create a deep copy of this state."""
-        new_state = ContainerLoadingState(self.assignment, self.container_size, self.step2_settings_file)
+        new_state = ContainerLoadingState(
+            self.assignment, self.container_size, self.container_weight, 
+            self.step2_settings_file, self.verbose
+        )
         new_state.statuses = self.statuses.copy()
         new_state.soft_scores = self.soft_scores.copy()
         new_state.aggregate_score = self.aggregate_score
@@ -271,8 +278,8 @@ def repair_cpsat(destroyed: ContainerLoadingState, rng: rnd.Generator) -> Contai
     # Container count: allow new containers for removed items
     max_containers = len(destroyed.assignment) + len(removed_items)
     
-    # Get container weight from settings file
-    container_weight = get_container_weight_from_settings(destroyed.step2_settings_file)
+    # Get container weight from the state
+    container_weight = destroyed.container_weight
     
     # Build model
     group_penalty_lambda = 1
@@ -311,19 +318,50 @@ def repair_cpsat(destroyed: ContainerLoadingState, rng: rnd.Generator) -> Contai
                 break
     
     # Create new state with repaired assignment
-    repaired_state = ContainerLoadingState(new_assignment, destroyed.container_size, destroyed.step2_settings_file)
+    repaired_state = ContainerLoadingState(
+        new_assignment, destroyed.container_size, destroyed.container_weight, 
+        destroyed.step2_settings_file, destroyed.verbose
+    )
     return repaired_state
 
 
-def get_container_weight_from_settings(step2_settings_file):
-    """Helper function to extract container weight from step2 settings."""
-    try:
-        with open(step2_settings_file, 'r') as f:
-            settings = json.load(f)
-        return settings.get('container_weight', 1000)  # Default weight if not found
-    except:
-        return 1000  # Default fallback
 
+
+
+class StoppingCriterionWithProgress:
+    """
+    A custom stopping criterion that wraps other criteria and prints progress.
+    """
+    def __init__(self, max_iterations, max_no_improve):
+        self.max_iterations = max_iterations
+        self.max_no_improve = max_no_improve
+        self.iteration = 0
+        self.no_improve = 0
+
+    def __call__(self, rng, best, current):
+        self.iteration += 1
+        
+        # Check if the best solution has improved
+        if best.objective() < getattr(self, '_last_best_obj', float('inf')):
+            self._last_best_obj = best.objective()
+            self.no_improve = 0
+        else:
+            self.no_improve += 1
+            
+        # Print progress
+        progress_bar = f"Iteration {self.iteration}/{self.max_iterations} | "
+        progress_bar += f"No improvement {self.no_improve}/{self.max_no_improve}"
+        print(progress_bar, end='\r') # Use carriage return to print on the same line
+
+        # Check stopping conditions
+        if self.iteration >= self.max_iterations:
+            print("\nStopping: Max iterations reached.")
+            return True
+        if self.no_improve >= self.max_no_improve:
+            print("\nStopping: Max no improvement reached.")
+            return True
+            
+        return False
 
 # --- Custom ALNS Acceptance Criterion ---
 class CustomContainerAcceptance:
@@ -370,7 +408,7 @@ class CustomContainerAcceptance:
 # --- Main ALNS Function ---
 def run_alns_with_library(
     initial_assignment, container_size, container_weight, step2_settings_file,
-    num_iterations, num_remove, time_limit, max_no_improve, seed=42):
+    num_iterations, num_remove, time_limit, max_no_improve, seed=42, verbose=False):
     """
     Run ALNS using the official ALNS library.
     
@@ -397,8 +435,10 @@ def run_alns_with_library(
         step2_settings_file = os.path.join(base_dir, step2_settings_file)
     print('***** Starting ALNS with official library ...')
     
-    # Create initial state
-    initial_state = ContainerLoadingState(initial_assignment, container_size, step2_settings_file)
+    # Create initial state, passing the weight needed for repair.
+    initial_state = ContainerLoadingState(
+        initial_assignment, container_size, container_weight, step2_settings_file, verbose
+    )
     print('***** Getting step 2 baseline ...')
     initial_score = initial_state.objective()
     print(f'Initial step 2 solution: aggregate_score={initial_score}, statuses={initial_state.statuses}')
@@ -416,11 +456,7 @@ def run_alns_with_library(
     select = RouletteWheel([10, 6, 3, 1], decay=0.8, num_destroy=1, num_repair=1)
     accept = CustomContainerAcceptance()  # Use custom acceptance criterion matching original logic
     
-    # Create combined stopping criteria: stop when ANY condition is met
-    stop = CombinedStoppingCriterion(
-        MaxIterations(num_iterations),
-        NoImprovement(max_no_improve)
-    )
+    stop = StoppingCriterionWithProgress(num_iterations, max_no_improve)
     
     print(f'Starting ALNS iterations with {num_iterations} max iterations, {max_no_improve} max no-improvement iterations, {time_limit}s time limit')
     
@@ -457,129 +493,4 @@ def run_alns_with_library(
 
 
 # --- Example main entry point ---
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print('Usage: python alns_container_loading_refactored.py <input_json_file>')
-        sys.exit(1)
-    
-    input_filename = sys.argv[1]
-    
-    # Validate input file exists
-    if not os.path.exists(input_filename):
-        print(f'Error: Input file "{input_filename}" does not exist.')
-        sys.exit(1)
-    
-    print(f'Reading input from {input_filename}')
-    
-    try:
-        with open(input_filename, 'r') as f:
-            data = json.load(f)
-    except json.JSONDecodeError as e:
-        print(f'Error: Invalid JSON in input file "{input_filename}": {e}')
-        sys.exit(1)
-    
-    # Extract data (validation code omitted for brevity - same as original)
-    container_size = data['container']['size']
-    container_weight = data['container']['weight']
-    step2_settings_file = data.get('step2_settings_file', None)
-    
-    items = []
-    item_ids = [item.get('id', i+1) for i, item in enumerate(data['items'])]
-    
-    # Validate no duplicate item IDs
-    if len(item_ids) != len(set(item_ids)):
-        duplicate_ids = [id for id in item_ids if item_ids.count(id) > 1]
-        print(f'Error: Duplicate item IDs detected: {duplicate_ids}')
-        print('Each item must have a unique ID. Please fix the input data.')
-        sys.exit(1)
-    
-    item_group_ids = [item.get('group_id') for item in data['items']]
-    for i in range(len(data['items'])):
-        item = {
-            'id': item_ids[i],
-            'size': data['items'][i]['size'],
-            'weight': data['items'][i]['weight'],
-            'group_id': item_group_ids[i],
-            'rotation': data['items'][i].get('rotation')
-        }
-        items.append(item)
-    
-    # Build initial assignment using phase 1
-    group_to_items = defaultdict(list)
-    for idx, gid in enumerate(item_group_ids):
-        if gid is not None:
-            group_to_items[gid].append(idx)
-    
-    max_containers = len(items)
-    group_penalty_lambda = 1
-    
-    model, x, y, group_in_containers, group_ids = build_step1_assignment_model(
-        items, container_size, container_weight, max_containers,
-        group_to_items=group_to_items, fixed_assignments=None,
-        group_penalty_lambda=group_penalty_lambda, dump_inputs=True
-    )
-    
-    from ortools.sat.python import cp_model
-    print(f'Running phase 1 baseline.')
-    solver = cp_model.CpSolver()
-    status = solver.Solve(model)
-     # Dump results for initial assignment
-    dump_phase1_results(
-        solver, status, x, y, group_in_containers, group_ids, group_to_items,
-        items, container_size, container_weight, verbose=False)
 
-    # Extract assignment
-    initial_assignment = []
-    used_container_indices = [j for j in range(max_containers) if solver.Value(y[j])]
-    container_rebase = {old_idx: new_idx+1 for new_idx, old_idx in enumerate(used_container_indices)}
-    for old_j in used_container_indices:
-        new_j = container_rebase[old_j]
-        items_in_container = [i for i in range(len(items)) if solver.Value(x[i, old_j])]
-        container_entry = {
-            'id': new_j,
-            'size': container_size,
-            'boxes': [items[i] for i in items_in_container]
-        }
-        initial_assignment.append(container_entry)
-    
-    # Get ALNS parameters
-    alns_params = data.get('alns_params', {})
-    num_iterations = alns_params.get('num_iterations', 100)
-    num_can_be_moved_percentage = alns_params.get('num_can_be_moved_percentage', 10)  # Default 10%
-    time_limit = alns_params.get('time_limit', 300)
-    max_no_improve = alns_params.get('max_no_improve', 50)
-    
-    # Calculate num_remove based on total items and percentage
-    total_items = len(items)
-    num_remove = max(1, int(total_items * num_can_be_moved_percentage / 100))
-    print(f'Total items: {total_items}, num_can_be_moved_percentage: {num_can_be_moved_percentage}%, calculated num_remove: {num_remove}')
-    
-    # Ensure outputs directory exists
-    if not os.path.exists('outputs'):
-        os.makedirs('outputs')
-    
-    # Run ALNS
-    print('calling ALNS with library...')
-    best_solution, result = run_alns_with_library(
-        initial_assignment, container_size, container_weight, step2_settings_file,
-        num_iterations=num_iterations, num_remove=num_remove,
-        time_limit=time_limit, max_no_improve=max_no_improve)
-    
-    # Write best solution to file
-    now = time.strftime('%Y-%m-%d-%H-%M-%S')
-    out_json = f'outputs/alns_best_solution_library_{now}.json'
-    with open(out_json, 'w', encoding='utf-8') as fout:
-        json.dump({
-            'assignment': best_solution.assignment, 
-            'statuses': best_solution.statuses, 
-            'aggregate_score': best_solution.aggregate_score
-        }, fout, indent=2)
-    print(f'Best solution written to {out_json}')
-    
-    # Print statistics
-    print(f"\nALNS Statistics:")
-    print(f"Best objective: {result.best_state.objective()}")
-    print(f"Iterations: {len(result.statistics.objectives)}")
-    print(f"Total runtime: {result.statistics.total_runtime:.2f} seconds")
-    
-    input("Press any key to exit (it will close container visualization windows)")

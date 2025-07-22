@@ -111,8 +111,8 @@ def run(data, output_filename):
     # Solve
     from ortools.sat.python import cp_model
     solver = cp_model.CpSolver()
-    if data.get('log_search_progress', False):
-        solver.parameters.log_search_progress = True
+    #if data.get('log_search_progress', False):
+     #   solver.parameters.log_search_progress = True
     solver.parameters.max_time_in_seconds = data.get('max_time_in_seconds', 60.0)
     status = solver.Solve(model)
 
@@ -269,15 +269,4 @@ def run(data, output_filename):
 
     input("Press any key to exit ...")  # Keeps the plot open until you press Enter
 
-if __name__ == "__main__": 
-    # Get input filename from command line
-    if len(sys.argv) < 3:
-        print('Usage: python container_bin_packing.py <input_json_file> <output_json_file>')
-        sys.exit(1)
-    input_filename = sys.argv[1]
-    output_filename = sys.argv[2]
-    # Read input data from JSON file
 
-    with open(input_filename, 'r') as f:
-        data = json.load(f)
-        run(data, output_filename)
