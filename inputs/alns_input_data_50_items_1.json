@@ -6,7 +6,7 @@
     "max_no_improve": 5
   },
   "log_search_progress": false,
-  "max_time_in_seconds": 15,
+  "max_time_in_seconds": 10,
   "step2_settings_file": "inputs/step2_settings_a.json",
   "container": {
     "weight": 40,

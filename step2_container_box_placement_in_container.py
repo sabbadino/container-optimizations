@@ -121,7 +121,7 @@ def run_inner(container_id,container, boxes, symmetry_mode, max_time, anchor_mod
 
 
     # Solve
-
+    print(f'run inner max_time_in_seconds {max_time}');
     solver.parameters.max_time_in_seconds = max_time
     print(f'Solver max_time_in_seconds: {max_time}')
     start_time = time.time()

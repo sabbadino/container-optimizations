@@ -72,6 +72,9 @@ def main():
 
     solver = cp_model.CpSolver()
     #solver.parameters.log_search_progress = args.verbose
+    max_time_in_seconds = data.get('max_time_in_seconds', 60)
+    print (f'Running phase 1 baseline with max_time_in_seconds {max_time_in_seconds}')
+    solver.parameters.max_time_in_seconds = max_time_in_seconds
     status = solver.Solve(model)
 
     dump_phase1_results(
@@ -116,7 +119,7 @@ def main():
 
             best_solution, _ = run_alns_with_library(
                 initial_assignment, container_size, container_weight, step2_settings_file,
-                num_iterations, num_remove, time_limit, max_no_improve, verbose=args.verbose
+                num_iterations, num_remove, time_limit, max_no_improve, max_time_in_seconds, verbose=args.verbose
             )
             best_solution = best_solution.assignment
     else:
