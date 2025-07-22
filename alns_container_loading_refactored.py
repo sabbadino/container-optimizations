@@ -55,7 +55,7 @@ class ContainerLoadingState:
         self.step2_settings_file = step2_settings_file
         self.verbose = verbose
         self.statuses = []  # 'OPTIMAL', 'FEASIBLE', 'UNFEASIBLE' per container
-        self.soft_scores = []  # soft objective scores per container (to be filled)
+        #self.soft_scores = []  # soft objective scores per container (to be filled)
         self.aggregate_score = None
         self.visualization_data = []  # store visualization info per container
         self._objective_computed = False
@@ -76,7 +76,7 @@ class ContainerLoadingState:
         Store visualization info for each container.
         """
         self.statuses = []
-        self.soft_scores = []
+        #self.soft_scores = []
         self.visualization_data = []
         container_volume = self.container_size[0] * self.container_size[1] * self.container_size[2]
         if container_volume <= 0:
@@ -87,7 +87,7 @@ class ContainerLoadingState:
             boxes = container.get('boxes', [])
             if not boxes:
                 self.statuses.append('UNFEASIBLE')
-                self.soft_scores.append(1)  # worst utilization
+                #self.soft_scores.append(1)  # worst utilization
                 self.visualization_data.append(None)
                 continue
             
@@ -110,44 +110,47 @@ class ContainerLoadingState:
                     box['final_orientation'] = p['orientation']
                     box['final_size'] = p['size']
             
-            # Soft score: 1 - volume utilization (per container, for variance calculation)
-            # Note: Individual scores will be used to calculate variance of utilization across containers
-            # Use placements data to get the actual volume utilization after step 2 optimization
-            if status in ['OPTIMAL', 'FEASIBLE'] and placements:
-                # Calculate total volume of successfully placed boxes using their actual sizes from placements
-                total_placed_volume = sum(p['size'][0] * p['size'][1] * p['size'][2] for p in placements)
-                volume_utilization = total_placed_volume / container_volume if container_volume > 0 else 0
-            else:
-                # If step 2 failed, use original box volumes as fallback (worst case)
-                total_box_volume = sum(box['size'][0] * box['size'][1] * box['size'][2] for box in boxes)
-                volume_utilization = total_box_volume / container_volume if container_volume > 0 else 0
+            # # Soft score: 1 - volume utilization (per container, for variance calculation)
+            # # Note: Individual scores will be used to calculate variance of utilization across containers
+            # # Use placements data to get the actual volume utilization after step 2 optimization
+            # if status in ['OPTIMAL', 'FEASIBLE'] and placements:
+            #     # Calculate total volume of successfully placed boxes using their actual sizes from placements
+            #     total_placed_volume = sum(p['size'][0] * p['size'][1] * p['size'][2] for p in placements)
+            #     volume_utilization = total_placed_volume / container_volume if container_volume > 0 else 0
+            # else:
+            #     # If step 2 failed, use original box volumes as fallback (worst case)
+            #     total_box_volume = sum(box['size'][0] * box['size'][1] * box['size'][2] for box in boxes)
+            #     volume_utilization = total_box_volume / container_volume if container_volume > 0 else 0
             
-            score = 1 - volume_utilization  # lower is better
-            self.soft_scores.append(score)
-            print(f'Container {container["id"]}: status={status}, volume_utilization={volume_utilization:.3f}, soft_score={score:.3f}, n_boxes={len(boxes)}, n_placements={len(placements) if placements else 0}')
+            # score = 1 - volume_utilization  # lower is better
+            #self.soft_scores.append(score)
+            #print(f'Container {container["id"]}: status={status}, volume_utilization={volume_utilization:.3f}, soft_score={score:.3f}, n_boxes={len(boxes)}, n_placements={len(placements) if placements else 0}')
+            print(f'Container {container["id"]}: status={status}, n_boxes={len(boxes)}, n_placements={len(placements) if placements else 0}')
         
-        # NEW SOFT SCORE: Minimize variance of container utilization percentages
-        # This rewards balanced loading across containers (lower variance = better balance)
-        if self.soft_scores:  # Only if we have containers
-            utilization_percentages = [(1 - score) * 100 for score in self.soft_scores]  # Convert back to percentages
-            mean_utilization = sum(utilization_percentages) / len(utilization_percentages)
-            variance = sum((util - mean_utilization) ** 2 for util in utilization_percentages) / len(utilization_percentages)
-            balance_penalty = variance / 100  # Normalize variance (0-100 range becomes 0-1)
-        else:
-            balance_penalty = 0
-            variance = 0
-            mean_utilization = 0
+        # # NEW SOFT SCORE: Minimize variance of container utilization percentages
+        # # This rewards balanced loading across containers (lower variance = better balance)
+        # if self.soft_scores:  # Only if we have containers
+        #     utilization_percentages = [(1 - score) * 100 for score in self.soft_scores]  # Convert back to percentages
+        #     mean_utilization = sum(utilization_percentages) / len(utilization_percentages)
+        #     variance = sum((util - mean_utilization) ** 2 for util in utilization_percentages) / len(utilization_percentages)
+        #     balance_penalty = variance / 100  # Normalize variance (0-100 range becomes 0-1)
+        # else:
+        #     balance_penalty = 0
+        #     variance = 0
+        #     mean_utilization = 0
         
         # Aggregate score: penalize UNFEASIBLE, add balance penalty, subtract bonuses
         penalty = 1000 * self.statuses.count('UNFEASIBLE') + 500 * self.statuses.count('UNKNOWN')
         optimal_bonus = 2 * self.statuses.count('OPTIMAL')
         feasible_bonus = 1 * self.statuses.count('FEASIBLE')
-        self.aggregate_score = penalty + balance_penalty - optimal_bonus - feasible_bonus
+        #self.aggregate_score = penalty + balance_penalty - optimal_bonus - feasible_bonus
+        self.aggregate_score = penalty  - optimal_bonus - feasible_bonus
         
         # Print in blue color using ANSI escape code
         print('')
-        print(f'\033[94mAggregate score: {self.aggregate_score} (penalty={penalty} + balance_penalty={balance_penalty:.3f} - optimal_bonus={optimal_bonus} - feasible_bonus={feasible_bonus})\033[0m')
-        print(f'\033[94mUtilization stats: mean={mean_utilization:.1f}%, variance={variance:.1f}, percentages={[f"{p:.1f}%" for p in utilization_percentages]}\033[0m')
+        #print(f'\033[94mAggregate score: {self.aggregate_score} (penalty={penalty} + balance_penalty={balance_penalty:.3f} - optimal_bonus={optimal_bonus} - feasible_bonus={feasible_bonus})\033[0m')
+        print(f'\033[94mAggregate score: {self.aggregate_score} (penalty={penalty} - optimal_bonus={optimal_bonus} - feasible_bonus={feasible_bonus})\033[0m')
+        #print(f'\033[94mUtilization stats: mean={mean_utilization:.1f}%, variance={variance:.1f}, percentages={[f"{p:.1f}%" for p in utilization_percentages]}\033[0m')
         
         self._objective_computed = True
         return self.aggregate_score
@@ -165,7 +168,7 @@ class ContainerLoadingState:
             self.step2_settings_file, self.verbose
         )
         new_state.statuses = self.statuses.copy()
-        new_state.soft_scores = self.soft_scores.copy()
+        #new_state.soft_scores = self.soft_scores.copy()
         new_state.aggregate_score = self.aggregate_score
         new_state.visualization_data = copy.deepcopy(self.visualization_data)
         new_state._objective_computed = self._objective_computed

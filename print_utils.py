@@ -110,8 +110,8 @@ def dump_phase1_results(
             
             for i in items_in_container:
                 print_if_verbose(f'| {item_ids[i]} | {item_weights[i]} | {item_volumes[i]} | {item_group_ids[i]} |')
-            print_if_verbose(f'**Total for container {new_j}: weight = {total_weight} ({pct_weight:.1f}% of max), volume = {total_volume} ({pct_volume:.1f}% of max)**')
-        
+            print(f'**Total for container {new_j}: total items {len(items_in_container)} weight = {total_weight} ({pct_weight:.1f}% of max), volume = {total_volume} ({pct_volume:.1f}% of max)**')
+
         print(f'Total boxes weight check: {total_boxes_weight_check}')
         print(f'Total boxes volume check: {total_boxes_volume_check}')    
         print(f'Total container boxes: {total_container_boxes}')            
