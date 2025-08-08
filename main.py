@@ -117,11 +117,18 @@ def main():
             
             num_remove = max(1, int(len(items) * num_can_be_moved_percentage / 100))
 
-            best_solution, _ = run_alns_with_library(
+            # Run ALNS; it evaluates step 2 internally and stores placements per container
+            best_state, _ = run_alns_with_library(
                 initial_assignment, container_size, container_weight, step2_settings_file,
                 num_iterations, num_remove, time_limit, max_no_improve, max_time_in_seconds, verbose=args.verbose
             )
-            best_solution = best_solution.assignment
+            # Extract best assignment and attach placements/status so orientations are present in the output
+            best_assignment = best_state.assignment
+            vis_list = getattr(best_state, 'visualization_data', []) or []
+            for c_idx, container in enumerate(best_assignment):
+                if c_idx < len(vis_list) and vis_list[c_idx] is not None:
+                    container['placements'] = vis_list[c_idx].get('placements', [])
+                    container['status'] = vis_list[c_idx].get('status_str')
     else:
         print("\n--- Skipping ALNS Refinement Step ---")
 
@@ -151,6 +158,14 @@ def main():
             )
             container_to_pack['placements'] = placements
             container_to_pack['status'] = status_str
+            # Propagate final_* fields to boxes so orientation/position/size are at box level
+            placement_by_id = {p.get('id'): p for p in placements}
+            for b in boxes_in_container:
+                p = placement_by_id.get(b.get('id'))
+                if p:
+                    b['final_position'] = p.get('position')
+                    b['final_orientation'] = p.get('orientation')
+                    b['final_size'] = p.get('size')
             final_placements.append(container_to_pack)
         best_assignment = final_placements
 
