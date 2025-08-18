@@ -1,4 +1,4 @@
-def visualize_solution(time_taken, container, boxes, perms_list, placements, status_str=None):
+def visualize_solution(time_taken, container, boxes, placements, status_str=None):
     """Render a 3D visualization of the container and placed boxes.
 
     Args:
@@ -7,8 +7,7 @@ def visualize_solution(time_taken, container, boxes, perms_list, placements, sta
             - size triple [L, W, H], or
             - dict with keys: 'size' = [L, W, H] and optional 'id'.
         boxes: List of box dicts (metadata; used for ids and original sizes).
-        perms_list: List of allowed orientation dimension tuples per box.
-        placements: List of dicts with keys 'position', 'orientation', 'size', etc. (as returned by run_inner).
+    placements: List of dicts with keys 'position', 'orientation', 'size', 'rotation_type'.
         status_str: Optional solver status string for the title.
     Note: If container is a dict with an 'id', it will be shown in the title.
 
@@ -51,6 +50,23 @@ def visualize_solution(time_taken, container, boxes, perms_list, placements, sta
                  ([cx,cy,0],[cx,cy,cz]), ([cx,0,cz],[cx,cy,cz]), ([0,cy,cz],[cx,cy,cz])]:
         ax.plot3D(*zip(s, e), color="black", linewidth=0.5)
 
+    # Helper: map orientation index to (l,w,h) perm without needing perms_list
+    def _orientation_to_perm(size, orient_idx, rotation_type):
+        l0, w0, h0 = size
+        if rotation_type in ("fixed", "none"):
+            mapping = [(l0, w0, h0)]
+        elif rotation_type == "z":
+            mapping = [(l0, w0, h0), (w0, l0, h0)]
+        else:  # 'free' or unknown -> default to full 6-permutation order used in the model
+            mapping = [
+                (l0, w0, h0), (l0, h0, w0), (w0, l0, h0),
+                (w0, h0, l0), (h0, l0, w0), (h0, w0, l0)
+            ]
+        # Guard against bad indices
+        if orient_idx is None or orient_idx < 0 or orient_idx >= len(mapping):
+            return None
+        return mapping[orient_idx]
+
     # Draw each box as a colored solid
     n_local = len(placements)
     # Use modern, non-deprecated colormap access. We don't rely on LUT sizing
@@ -92,7 +108,11 @@ def visualize_solution(time_taken, container, boxes, perms_list, placements, sta
         center_x = xi + l / 2
         center_y = yi + w / 2
         center_z = zi + h / 2
-        perm = perms_list[i][orient_idx]
+        # Compute perm from orientation + rotation_type
+        rotation_type = placement.get('rotation_type', boxes[i].get('rotation', 'free'))
+        perm = _orientation_to_perm(boxes[i]['size'], orient_idx, rotation_type)
+        if perm is None:
+            perm = (l, w, h)  # last resort: use effective size
         orig_axes = []
         used = [False, False, False]
         for val in perm:

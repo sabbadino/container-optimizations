@@ -158,7 +158,6 @@ def main():
                             step2_viz.get('elapsed_time'),
                             {"id": container.get('id'), "size": container_size},
                             container.get('boxes', []),
-                            step2_viz.get('perms_list', []),
                             step2_viz.get('placements', []),
                             step2_viz.get('status_str'),
                         )
@@ -217,7 +216,6 @@ def main():
                     step2_results.get('elapsed_time'),
                     {"id": container_id, "size": container_size},
                     boxes_in_container,
-                    step2_results.get('perms_list', []),
                     placements,
                     status_str,
                 )

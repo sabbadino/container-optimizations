@@ -150,7 +150,10 @@ def test_can_fit_geometrically_1():
             "orientation": k_sel,
         })
     # Pass container as dict with 'size' key per visualize_solution API
-    visualize_solution(0, {"size": list(container)}, boxes, perms_list, placements, status_dict.get(status, str(status)))
+    # Include rotation_type consistent with model logic; default to 'free'
+    for p in placements:
+        p.setdefault('rotation_type', boxes[p['id']-1].get('rotation', 'free') if isinstance(p.get('id'), int) else 'free')
+    visualize_solution(0, {"size": list(container)}, boxes, placements, status_dict.get(status, str(status)))
 
 def test_can_fit_geometrically_2():
     from model_setup import setup_3d_bin_packing_model
@@ -270,6 +273,9 @@ def test_can_fit_geometrically_3():
             "size": (l_sel, w_sel, h_sel),
             "orientation": k_sel,
         })
+    # Include rotation_type; default to box's rotation or 'free'
+    for idx, p in enumerate(placements):
+        p.setdefault('rotation_type', boxes[idx].get('rotation', 'free'))
     # Pass container as dict with 'size' key per visualize_solution API
-    visualize_solution(0, {"size": list(container)}, boxes, perms_list, placements, status_dict.get(status, str(status)))
+    visualize_solution(0, {"size": list(container)}, boxes, placements, status_dict.get(status, str(status)))
 
