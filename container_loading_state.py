@@ -59,7 +59,7 @@ class ContainerLoadingState:
             # Run step 2 placement and get placements and visualization info
             status, step2_results = run_phase_2(
                 {"id": container['id'], "size": self.container_size}, boxes,
-                self.step2_settings_file, self.verbose, False
+                self.step2_settings_file, self.verbose
             )
             print(f'Completed run of phase 2 for container {container["id"]} with size {self.container_size}')
             self.statuses.append(status)
@@ -72,7 +72,6 @@ class ContainerLoadingState:
                 if p is not None:
                     box['final_position'] = p['position']
                     box['final_orientation'] = p['orientation']
-                    box['final_size'] = p['size']
 
             print(f'Container {container["id"]}: status={status}, n_boxes={len(boxes)}, n_placements={len(placements) if placements else 0}')
 

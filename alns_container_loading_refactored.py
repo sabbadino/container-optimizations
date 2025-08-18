@@ -288,8 +288,9 @@ def run_alns_with_library(
 
     result = alns.iterate(initial_state, select, accept, stop)
     best_solution = result.best_state
-    print('***** ALNS run complete *****')
-    print(f'Best solution objective: {best_solution.objective()}')
+    best_score = best_solution.objective()
+    
+    print(f'ALNS finished. Best aggregate_score={best_score}, statuses={best_solution.statuses}')
 
     return best_solution, result
 

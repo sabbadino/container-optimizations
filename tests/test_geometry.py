@@ -149,7 +149,8 @@ def test_can_fit_geometrically_1():
             "size": (l_sel, w_sel, h_sel),
             "orientation": k_sel,
         })
-    visualize_solution(0, container, boxes, perms_list, placements, status_dict.get(status, str(status)))
+    # Pass container as dict with 'size' key per visualize_solution API
+    visualize_solution(0, {"size": list(container)}, boxes, perms_list, placements, status_dict.get(status, str(status)))
 
 def test_can_fit_geometrically_2():
     from model_setup import setup_3d_bin_packing_model
@@ -269,5 +270,6 @@ def test_can_fit_geometrically_3():
             "size": (l_sel, w_sel, h_sel),
             "orientation": k_sel,
         })
-    visualize_solution(0, container, boxes, perms_list, placements, status_dict.get(status, str(status)))
+    # Pass container as dict with 'size' key per visualize_solution API
+    visualize_solution(0, {"size": list(container)}, boxes, perms_list, placements, status_dict.get(status, str(status)))
 

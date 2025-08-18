@@ -9,6 +9,7 @@ from assignment_model import build_step1_assignment_model
 from print_utils import dump_phase1_results
 from alns_container_loading_refactored import run_alns_with_library
 from step2_container_box_placement_in_container import run_phase_2
+from visualization_utils import visualize_solution
 
 def main():
     """
@@ -22,6 +23,21 @@ def main():
     parser.add_argument('--no-alns', action='store_true', help="Skip the ALNS refinement step and go straight from Phase 1 to Phase 2.")
     parser.add_argument('--verbose', action='store_true', help="Enable detailed logging throughout the process.")
     args = parser.parse_args()
+
+    # Utility: map orientation index -> axis order string
+    def _orientation_desc(o):
+        try:
+            mapping = {
+                0: "L,W,H",
+                1: "L,H,W",
+                2: "W,L,H",
+                3: "W,H,L",
+                4: "H,L,W",
+                5: "H,W,L",
+            }
+            return mapping.get(int(o)) if o is not None else None
+        except Exception:
+            return None
 
     # --- 1. Load Input Data ---
     print(f"--- Loading Input Data from {args.input} ---")
@@ -131,6 +147,39 @@ def main():
                 if c_idx < len(vis_list) and vis_list[c_idx] is not None:
                     container['placements'] = vis_list[c_idx].get('placements', [])
                     container['status'] = vis_list[c_idx].get('status_str')
+
+            # Visualize ALNS best solution per container using stored phase-2 info
+            try:
+                import matplotlib.pyplot as plt  # ensure matplotlib is available
+                for c_idx, container in enumerate(best_assignment):
+                    if c_idx < len(vis_list) and vis_list[c_idx] is not None and container.get('boxes'):
+                        step2_viz = vis_list[c_idx]
+                        plt_obj = visualize_solution(
+                            step2_viz.get('elapsed_time'),
+                            {"id": container.get('id'), "size": container_size},
+                            container.get('boxes', []),
+                            step2_viz.get('perms_list', []),
+                            step2_viz.get('placements', []),
+                            step2_viz.get('status_str'),
+                        )
+                        plt_obj.show(block=False)
+            except ImportError:
+                print("matplotlib not available; skipping ALNS visualization.")
+            except Exception as e:
+                print(f"Visualization error: {e}")
+
+            # Propagate placement info to boxes and add final_orientation_desc
+            for c_idx, container in enumerate(best_assignment):
+                boxes_in_container = container.get('boxes', []) or []
+                placements = container.get('placements', []) or []
+                placement_by_id = {p.get('id'): p for p in placements}
+                for b in boxes_in_container:
+                    p = placement_by_id.get(b.get('id'))
+                    if p:
+                        b['final_position'] = p.get('position')
+                        b['final_orientation'] = p.get('orientation')
+                    if 'final_orientation' in b and b.get('final_orientation') is not None:
+                        b['final_orientation_desc'] = _orientation_desc(b.get('final_orientation'))
     else:
         print("\n--- Skipping ALNS Refinement Step ---")
 
@@ -156,11 +205,27 @@ def main():
             print(f"--- Packing Container ID: {container_id} ---")
             status_str, step2_results = run_phase_2(
                 {"id": container_id, "size": container_size}, boxes_in_container,
-                step2_settings_file, verbose=args.verbose, visualize=True
+                step2_settings_file, verbose=args.verbose
             )
             placements = step2_results.get('placements', []) if isinstance(step2_results, dict) else []
             container_to_pack['placements'] = placements
             container_to_pack['status'] = status_str
+            # Visualize Phase 2 result for this container (show container id in title)
+            try:
+                import matplotlib.pyplot as plt  # gate visualization to avoid visualize_solution exiting on ImportError
+                plt_obj = visualize_solution(
+                    step2_results.get('elapsed_time'),
+                    {"id": container_id, "size": container_size},
+                    boxes_in_container,
+                    step2_results.get('perms_list', []),
+                    placements,
+                    status_str,
+                )
+                plt_obj.show(block=False)
+            except ImportError:
+                print("matplotlib not available; skipping Phase 2 visualization.")
+            except Exception as e:
+                print(f"Visualization error: {e}")
             # Propagate final_* fields to boxes so orientation/position/size are at box level
             placement_by_id = {p.get('id'): p for p in placements}
             for b in boxes_in_container:
@@ -168,7 +233,8 @@ def main():
                 if p:
                     b['final_position'] = p.get('position')
                     b['final_orientation'] = p.get('orientation')
-                    b['final_size'] = p.get('size')
+                if 'final_orientation' in b and b.get('final_orientation') is not None:
+                    b['final_orientation_desc'] = _orientation_desc(b.get('final_orientation'))
             final_placements.append(container_to_pack)
         best_assignment = final_placements
 
@@ -177,6 +243,12 @@ def main():
     output_dir = os.path.dirname(args.output)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
+
+    # Ensure final_orientation_desc is present when final_orientation exists
+    for container in best_assignment:
+        for b in container.get('boxes', []) or []:
+            if 'final_orientation' in b and b.get('final_orientation') is not None and 'final_orientation_desc' not in b:
+                b['final_orientation_desc'] = _orientation_desc(b.get('final_orientation'))
 
     # The best_assignment from ALNS already contains the detailed placement info.
     with open(args.output, 'w') as f:

@@ -3,7 +3,7 @@ import sys
 from ortools.sat.python import cp_model
 from load_utils import load_data_from_json
 
-def run_phase_2(container, boxes, settingsfile, verbose=True, visualize=True):
+def run_phase_2(container, boxes, settingsfile, verbose=True):
     """Run phase 2: place boxes inside a single container using CP-SAT.
 
     This function loads solver/heuristic settings from a JSON file and
@@ -22,7 +22,7 @@ def run_phase_2(container, boxes, settingsfile, verbose=True, visualize=True):
             parameters (e.g., symmetry_mode, max_time_in_seconds, anchor_mode,
             and preference weights).
         verbose: If True, print diagnostic information.
-        visualize: If True, create a 3D visualization of the solution.
+    visualize: Deprecated. Visualization is now handled by the caller.
 
     Returns:
         Tuple[str, dict]:
@@ -60,11 +60,10 @@ def run_phase_2(container, boxes, settingsfile, verbose=True, visualize=True):
         prefer_total_floor_area_weight,
         prefer_large_base_lower_non_linear_weight,
         prefer_put_boxes_by_volume_lower_z_weight,
-        verbose,
-        visualize)
+        verbose)
     return status_str, step2_results
 
-def run_inner(container, boxes, symmetry_mode, max_time, anchor_mode,     prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight,     prefer_maximize_surface_contact_weight,     prefer_large_base_lower_weight,     prefer_total_floor_area_weight,     prefer_large_base_lower_non_linear_weight,     prefer_put_boxes_by_volume_lower_z_weight,     verbose=False, visualize=True ):
+def run_inner(container, boxes, symmetry_mode, max_time, anchor_mode,     prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight,     prefer_maximize_surface_contact_weight,     prefer_large_base_lower_weight,     prefer_total_floor_area_weight,     prefer_large_base_lower_non_linear_weight,     prefer_put_boxes_by_volume_lower_z_weight,     verbose=False):
     """Builds and solves the 3D box placement CP-SAT model for one container.
 
     Sets up decision variables, hard constraints (inside container, no overlap,
@@ -100,7 +99,7 @@ def run_inner(container, boxes, symmetry_mode, max_time, anchor_mode,     prefer
         prefer_put_boxes_by_volume_lower_z_weight: Weight to prefer larger
             volume boxes at lower z.
         verbose: If True, prints diagnostic information.
-        visualize: If True, renders a 3D visualization of the solution.
+    visualize: Deprecated. No internal visualization is performed.
 
         Returns:
                 Tuple[str, dict]:
@@ -240,7 +239,15 @@ def run_inner(container, boxes, symmetry_mode, max_time, anchor_mode,     prefer
             
             # Get effective rotation policy used by the model (from local copy)
             current_rotation = boxes_local[i].get('rotation', 'free')
-            
+
+# orient_idx            
+#0 → [L, W, H]
+#1 → [L, H, W]
+#2 → [W, L, H]
+#3 → [W, H, L]
+#4 → [H, L, W]
+#5 → [H, W, L]
+
             placements.append({
                 'id': boxes[i].get('id'),
                 'position': pos,
@@ -250,12 +257,7 @@ def run_inner(container, boxes, symmetry_mode, max_time, anchor_mode,     prefer
             })
             print(f'BoxId {boxes[i].get("id")}: pos={pos}, size=({l}, {w}, {h}), orientation={orient_idx}, rotation_type={current_rotation}')
 
-        if visualize:
-            from visualization_utils import visualize_solution
-            # Use original boxes (unmodified) for visualization labels and original sizes
-            # container may be size triple; ID (if needed) is inferred when a dict is passed
-            plt = visualize_solution(elapsed_time, container, boxes, perms_list, placements, status_str)
-            plt.show(block=False)
+    # Visualization removed from step2. Callers should use visualization_utils.visualize_solution.
     else:
         print('No solution found.')
 

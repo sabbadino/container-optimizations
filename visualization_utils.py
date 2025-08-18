@@ -15,7 +15,15 @@ def visualize_solution(time_taken, container, boxes, perms_list, placements, sta
     Returns:
         matplotlib.pyplot (plt) with the plot configured; call plt.show() to display.
     """
+    # Ensure a non-interactive backend under pytest/headless to avoid Tk errors.
     try:
+        import os
+        import matplotlib
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            try:
+                matplotlib.use("Agg", force=True)
+            except Exception:
+                pass
         import matplotlib.pyplot as plt
         from mpl_toolkits.mplot3d.art3d import Poly3DCollection
     except ImportError:
@@ -45,7 +53,9 @@ def visualize_solution(time_taken, container, boxes, perms_list, placements, sta
 
     # Draw each box as a colored solid
     n_local = len(placements)
-    colors = plt.cm.get_cmap('tab20', max(n_local, 1))
+    # Use modern, non-deprecated colormap access. We don't rely on LUT sizing
+    # to keep compatibility across Matplotlib versions.
+    colors = plt.get_cmap('tab20')
     for i in range(n_local):
         placement = placements[i]
         xi, yi, zi = placement['position']
@@ -70,7 +80,12 @@ def visualize_solution(time_taken, container, boxes, perms_list, placements, sta
             [verts[1], verts[2], verts[6], verts[5]],
             [verts[4], verts[7], verts[3], verts[0]],
         ]
-        box = Poly3DCollection(faces, alpha=0.5, facecolor=colors(i), edgecolor='k')
+        box = Poly3DCollection(
+            faces,
+            alpha=0.5,
+            facecolor=colors(i % colors.N),
+            edgecolor='k'
+        )
         ax.add_collection3d(box)
 
         # Draw original axes after rotation using quivers
