@@ -119,7 +119,9 @@ def main():
 
             # Run ALNS; it evaluates step 2 internally and stores placements per container
             best_state, _ = run_alns_with_library(
-                initial_assignment, container_size, container_weight, step2_settings_file,
+                initial_assignment,
+                {"size": container_size, "weight": container_weight},
+                step2_settings_file,
                 num_iterations, num_remove, time_limit, max_no_improve, max_time_in_seconds, verbose=args.verbose
             )
             # Extract best assignment and attach placements/status so orientations are present in the output
@@ -152,10 +154,11 @@ def main():
                 continue
 
             print(f"--- Packing Container ID: {container_id} ---")
-            status_str, placements, _ = run_phase_2(
-                container_id, container_size, boxes_in_container,
+            status_str, step2_results = run_phase_2(
+                {"id": container_id, "size": container_size}, boxes_in_container,
                 step2_settings_file, verbose=args.verbose, visualize=True
             )
+            placements = step2_results.get('placements', []) if isinstance(step2_results, dict) else []
             container_to_pack['placements'] = placements
             container_to_pack['status'] = status_str
             # Propagate final_* fields to boxes so orientation/position/size are at box level

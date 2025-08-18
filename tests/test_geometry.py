@@ -134,7 +134,22 @@ def test_can_fit_geometrically_1():
 
     # Visualize the solution
     from visualization_utils import visualize_solution
-    visualize_solution(0, container, boxes, perms_list, orient, x, y, z, solver, n)
+    # Build placements to match new visualize_solution API
+    placements = []
+    for i in range(n):
+        xi = solver.Value(x[i])
+        yi = solver.Value(y[i])
+        zi = solver.Value(z[i])
+        orient_val = [solver.Value(orient[i][k]) for k in range(len(perms_list[i]))]
+        k_sel = orient_val.index(1) if 1 in orient_val else 0
+        l_sel, w_sel, h_sel = perms_list[i][k_sel]
+        placements.append({
+            "id": boxes[i].get("id", i),
+            "position": (xi, yi, zi),
+            "size": (l_sel, w_sel, h_sel),
+            "orientation": k_sel,
+        })
+    visualize_solution(0, container, boxes, perms_list, placements, status_dict.get(status, str(status)))
 
 def test_can_fit_geometrically_2():
     from model_setup import setup_3d_bin_packing_model
@@ -239,5 +254,20 @@ def test_can_fit_geometrically_3():
 
     # Visualize the solution
     from visualization_utils import visualize_solution
-    visualize_solution(0, container, boxes, perms_list, orient, x, y, z, solver, n)
+    # Build placements to match new visualize_solution API
+    placements = []
+    for i in range(n):
+        xi = solver.Value(x[i])
+        yi = solver.Value(y[i])
+        zi = solver.Value(z[i])
+        orient_val = [solver.Value(orient[i][k]) for k in range(len(perms_list[i]))]
+        k_sel = orient_val.index(1) if 1 in orient_val else 0
+        l_sel, w_sel, h_sel = perms_list[i][k_sel]
+        placements.append({
+            "id": boxes[i].get("id", i),
+            "position": (xi, yi, zi),
+            "size": (l_sel, w_sel, h_sel),
+            "orientation": k_sel,
+        })
+    visualize_solution(0, container, boxes, perms_list, placements, status_dict.get(status, str(status)))
 

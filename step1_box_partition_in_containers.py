@@ -262,7 +262,7 @@ def run(data, output_filename):
                 continue
             print(f'Running step 2 for container {container["id"]} with {len(boxes)} boxes...')     
 
-            status_str2, _, _ = run_phase_2(container["id"],data['container']['size'], boxes, step_2_settings_file, verbose=True, visualize=True)    
+            status_str2, _ = run_phase_2({"id": container["id"], "size": data['container']['size']}, boxes, step_2_settings_file, verbose=True, visualize=True)    
             if( status_str2 != 'OPTIMAL' and status_str2 != 'FEASIBLE'):
                 print(f'Step 2 failed for container {container["id"]}: {status_str2}')
                 input("Press any key to continue loop ...")

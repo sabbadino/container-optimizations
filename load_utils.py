@@ -84,7 +84,8 @@ def load_data_from_json(input_file):
     # Extract optional parameters with validation
     try:
         symmetry_mode = data.get('symmetry_mode', 'full')
-        valid_symmetry_modes = ['full', 'partial', 'none']
+        # Accept legacy/test value 'simple' in addition to the standard ones
+        valid_symmetry_modes = ['full', 'partial', 'none', 'simple']
         if symmetry_mode not in valid_symmetry_modes:
             raise ValueError(f"Invalid symmetry_mode: {symmetry_mode}. Must be one of {valid_symmetry_modes}")
         
@@ -94,7 +95,8 @@ def load_data_from_json(input_file):
         
         anchor_mode = data.get('anchor_mode', None)
         if anchor_mode is not None:
-            valid_anchor_modes = ['volume', 'weight', 'surface_area']
+            # Accept additional mode 'larger' used in tests/configs
+            valid_anchor_modes = ['volume', 'weight', 'surface_area', 'larger']
             if anchor_mode not in valid_anchor_modes:
                 raise ValueError(f"Invalid anchor_mode: {anchor_mode}. Must be one of {valid_anchor_modes}")
         

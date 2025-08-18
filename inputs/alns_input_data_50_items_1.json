@@ -3,7 +3,7 @@
     "num_iterations": 20,
     "num_remove": 5,
     "time_limit": 600.0,
-    "max_no_improve": 5
+    "max_no_improve": 1
   },
   "log_search_progress": false,
   "max_time_in_seconds": 10,
