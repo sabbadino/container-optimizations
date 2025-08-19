@@ -18,7 +18,7 @@ CP‑SAT reference: Google OR‑Tools Python CP‑SAT API (cp_model) [developers
 File: `main.py`
 
 1. Load inputs (JSON): container (size, weight), items (id, size, weight, rotation, group_id), and optional ALNS/Step2 settings.
-2. Phase 1 assignment (multiple‑knapsack style) with `assignment_model.build_step1_assignment_model`:
+2. Phase 1 assignment (multiple‑knapsack style) with `step1_model_builder.build_step1_model`:
    - Variables: x[i,j] item→container, y[j] container used.
    - Constraints: item assignment (=1), per‑container weight/volume ≤ capacity.
    - Objective: minimize used containers + group split penalty + volume imbalance penalty.
@@ -41,7 +41,7 @@ File: `main.py`
          |  main.py  |
          +-----------+
             |
-    Phase 1 (CP-SAT)  |  build_step1_assignment_model()
+    Phase 1 (CP-SAT)  |  build_step1_step1_model_builder()
             v
      +-------------------------------+
      | initial assignment (containers)|
@@ -94,7 +94,7 @@ Key building blocks:
 
 ## 4) Phase 1 – Assignment model (step-1)
 
-File: `assignment_model.py` → `build_step1_assignment_model(items, container_size, container_weight, max_containers, ...)`
+File: `step1_model_builder.py` → `build_step1_step1_model_builder(items, container_size, container_weight, max_containers, ...)`
 
 - Variables
   - x[i,j] ∈ {0,1}: item i assigned to container j.
@@ -243,7 +243,7 @@ This section clarifies the data/control flow inside the ALNS iterate loop and ho
     - removed items (free to assign), and
     - fixed items from the partial assignment (forced to their current container).
   - It constructs `fixed_assignments` and a `group_to_items` map. It sets `max_containers = current_used + removed_count` to allow opening new bins if needed.
-  - Calls `build_step1_assignment_model(...)` to create the Step‑1 CP‑SAT with weight/volume capacities, group split penalty, and x≤y linking; fixed items are channeled to their containers.
+  - Calls `build_step1_step1_model_builder(...)` to create the Step‑1 CP‑SAT with weight/volume capacities, group split penalty, and x≤y linking; fixed items are channeled to their containers.
   - Solves with a time limit via `cp_model.CpSolver.parameters.max_time_in_seconds = phase1_time_limit` and rebuilds a fresh `assignment` from the solution using the set of used `y[j]` indices.
   - Returns a new `ContainerLoadingState` wrapping this repaired full assignment.
 
@@ -274,7 +274,7 @@ This section clarifies the data/control flow inside the ALNS iterate loop and ho
   - Step‑2 settings: path to JSON with soft weights and options.
 - Destroy/Repair
   - Destroy mutates only a copy; it adds `state._removed_items` for the repair.
-  - Repair uses Step‑1 CP‑SAT (`build_step1_assignment_model`) with `fixed_assignments` and `group_to_items`; solve time is bounded by `phase1_time_limit`.
+  - Repair uses Step‑1 CP‑SAT (`build_step1_step1_model_builder`) with `fixed_assignments` and `group_to_items`; solve time is bounded by `phase1_time_limit`.
 - Objective/feasibility
   - `objective()` calls `evaluate()` and caches `aggregate_score`; `is_feasible()` is `statuses` ∉ {'UNFEASIBLE'}.
 
@@ -346,8 +346,8 @@ File: `visualization_utils.py` → `visualize_solution(time_taken, container, bo
 
 - `main.py`
   - Orchestrates input → Phase 1 → (ALNS?) → Phase 2 → output (+ visualization)
-- `assignment_model.py`
-  - `build_step1_assignment_model(...)` – CP‑SAT assignment, capacities, groups, balance, minimize containers
+- `step1_model_builder.py`
+  - `build_step1_step1_model_builder(...)` – CP‑SAT assignment, capacities, groups, balance, minimize containers
 - `model_setup.py`
   - `create_position_variables`, `create_orientation_and_dimension_variables`, `setup_3d_bin_packing_model`
 - `model_constraints.py`

@@ -5,7 +5,7 @@ import time
 from collections import defaultdict
 from ortools.sat.python import cp_model
 
-from assignment_model import build_step1_assignment_model
+from step1_model_builder import build_step1_model
 from print_utils import dump_phase1_results
 from alns_loop import run_alns_with_library
 from step2_box_placement_in_container import run_phase_2
@@ -79,7 +79,7 @@ def main():
     max_containers = len(items)
     group_penalty_lambda = 1.0 # This could be made configurable
 
-    model, x, y, group_in_containers, group_ids = build_step1_assignment_model(
+    model, x, y, group_in_containers, group_ids = build_step1_model(
         items, container_size, container_weight, max_containers,
         group_to_items=group_to_items,
         group_penalty_lambda=group_penalty_lambda,

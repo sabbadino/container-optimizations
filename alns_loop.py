@@ -28,7 +28,7 @@ from alns_criteria import StoppingCriterionWithProgress
 from alns_acceptance import CustomContainerAcceptance
 
 # Step1 model utilities
-from assignment_model import build_step1_assignment_model
+from step1_model_builder import build_step1_model
 from print_utils import dump_phase1_results
 
 
@@ -173,7 +173,7 @@ def create_repair_cpsat(max_time_in_seconds):
 
         # Build model
         group_penalty_lambda = 1
-        model, x, y, group_in_containers, group_ids = build_step1_assignment_model(
+        model, x, y, group_in_containers, group_ids = build_step1_model(
             all_items,
             destroyed.container_size,
             container_weight,
