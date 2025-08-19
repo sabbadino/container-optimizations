@@ -298,7 +298,7 @@ def run_alns_with_library(
 
     select = RouletteWheel([1, 0, 0, 0], decay=1.0, num_destroy=1, num_repair=1)
     accept = CustomContainerAcceptance()
-    stop = StoppingCriterionWithProgress(num_iterations, max_no_improve)
+    stop = StoppingCriterionWithProgress(num_iterations, max_no_improve, time_limit)
 
     print(
         f'Starting ALNS iterations with {num_iterations} max iterations, {max_no_improve} max no-improvement iterations, {time_limit}s time limit'

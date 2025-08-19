@@ -26,9 +26,9 @@ class ContainerLoadingState:
         self.aggregate_score = None
         self.visualization_data = []  # store visualization info per container
         self._objective_computed = False
-    # Placeholder used by ALNS destroy/repair operators to pass removed items
-    # between operators without mutating the original state.
-    self._removed_items = []
+        # Placeholder used by ALNS destroy/repair operators to pass removed items
+        # between operators without mutating the original state.
+        self._removed_items = []
 
     def objective(self) -> float:
         """
@@ -49,11 +49,13 @@ class ContainerLoadingState:
         self.visualization_data = []
         container_volume = self.container_size[0] * self.container_size[1] * self.container_size[2]
         if container_volume <= 0:
-            raise ValueError(f"Invalid container volume: {container_volume}. Container dimensions: {self.container_size}")
+            raise ValueError(
+                f"Invalid container volume: {container_volume}. Container dimensions: {self.container_size}"
+            )
 
-        for container in self.assignment:
-            print(f'**** Running phase 2 for container {container["id"]} with size {self.container_size}')
-            boxes = container.get('boxes', [])
+        for cont in self.assignment:
+            print(f'**** Running phase 2 for container {cont["id"]} with size {self.container_size}')
+            boxes = cont.get('boxes', [])
             if not boxes:
                 self.statuses.append('UNFEASIBLE')
                 self.visualization_data.append(None)
@@ -61,10 +63,10 @@ class ContainerLoadingState:
 
             # Run step 2 placement and get placements and visualization info
             status, step2_results = run_phase_2(
-                {"id": container['id'], "size": self.container_size}, boxes,
+                {"id": cont['id'], "size": self.container_size}, boxes,
                 self.step2_settings_file, self.verbose
             )
-            print(f'Completed run of phase 2 for container {container["id"]} with size {self.container_size}')
+            print(f'Completed run of phase 2 for container {cont["id"]} with size {self.container_size}')
             self.statuses.append(status)
             self.visualization_data.append(step2_results)
 
@@ -76,7 +78,10 @@ class ContainerLoadingState:
                     box['final_position'] = p['position']
                     box['final_orientation'] = p['orientation']
 
-            print(f'Container {container["id"]}: status={status}, n_boxes={len(boxes)}, n_placements={len(placements) if placements else 0}')
+            print(
+                f'Container {cont["id"]}: status={status}, n_boxes={len(boxes)}, '
+                f'n_placements={len(placements) if placements else 0}'
+            )
 
         penalty = 1000 * self.statuses.count('UNFEASIBLE') + 500 * self.statuses.count('UNKNOWN')
         optimal_bonus = 2 * self.statuses.count('OPTIMAL')
@@ -84,7 +89,10 @@ class ContainerLoadingState:
         self.aggregate_score = penalty - optimal_bonus - feasible_bonus
 
         print('')
-        print(f'\033[94mAggregate score: {self.aggregate_score} (penalty={penalty} - optimal_bonus={optimal_bonus} - feasible_bonus={feasible_bonus})\033[0m')
+        print(
+            f'\033[94mAggregate score: {self.aggregate_score} '
+            f'(penalty={penalty} - optimal_bonus={optimal_bonus} - feasible_bonus={feasible_bonus})\033[0m'
+        )
 
         self._objective_computed = True
         return self.aggregate_score
@@ -105,4 +113,5 @@ class ContainerLoadingState:
         new_state.aggregate_score = self.aggregate_score
         new_state.visualization_data = copy.deepcopy(self.visualization_data)
         new_state._objective_computed = self._objective_computed
+        new_state._removed_items = copy.deepcopy(self._removed_items)
         return new_state
