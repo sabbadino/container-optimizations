@@ -53,15 +53,17 @@ def visualize_solution(time_taken, container, boxes, placements, status_str=None
     # Helper: map orientation index to (l,w,h) perm without needing perms_list
     def _orientation_to_perm(size, orient_idx, rotation_type):
         l0, w0, h0 = size
-        if rotation_type in ("fixed", "none"):
+        if rotation_type == "none":
             mapping = [(l0, w0, h0)]
         elif rotation_type == "z":
             mapping = [(l0, w0, h0), (w0, l0, h0)]
-        else:  # 'free' or unknown -> default to full 6-permutation order used in the model
+        elif rotation_type == "free":
             mapping = [
                 (l0, w0, h0), (l0, h0, w0), (w0, l0, h0),
                 (w0, h0, l0), (h0, l0, w0), (h0, w0, l0)
             ]
+        else:
+            raise ValueError(f"Invalid rotation_type in placement: {rotation_type}. Must be one of ['none','z','free'].")
         # Guard against bad indices
         if orient_idx is None or orient_idx < 0 or orient_idx >= len(mapping):
             return None
@@ -109,7 +111,9 @@ def visualize_solution(time_taken, container, boxes, placements, status_str=None
         center_y = yi + w / 2
         center_z = zi + h / 2
         # Compute perm from orientation + rotation_type
-        rotation_type = placement.get('rotation_type', boxes[i].get('rotation', 'free'))
+        rotation_type = placement.get('rotation_type', boxes[i].get('rotation'))
+        if rotation_type not in ('none','z','free'):
+            raise ValueError(f"Invalid or missing rotation_type for placement/box {placements[i].get('id', i)}: {rotation_type}")
         perm = _orientation_to_perm(boxes[i]['size'], orient_idx, rotation_type)
         if perm is None:
             perm = (l, w, h)  # last resort: use effective size

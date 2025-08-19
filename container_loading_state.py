@@ -1,5 +1,5 @@
 import copy
-from step2_container_box_placement_in_container import run_phase_2
+from step2_box_placement_in_container import run_phase_2
 
 
 class ContainerLoadingState:
@@ -26,6 +26,9 @@ class ContainerLoadingState:
         self.aggregate_score = None
         self.visualization_data = []  # store visualization info per container
         self._objective_computed = False
+    # Placeholder used by ALNS destroy/repair operators to pass removed items
+    # between operators without mutating the original state.
+    self._removed_items = []
 
     def objective(self) -> float:
         """
@@ -34,9 +37,9 @@ class ContainerLoadingState:
         """
         if not self._objective_computed:
             self.evaluate()
-        return self.aggregate_score
+        return float(self.aggregate_score) if self.aggregate_score is not None else 0.0
 
-    def evaluate(self, verbose=False):
+    def evaluate(self):
         """
         For each container, run step 2 and collect status and soft objective score.
         Also update each box in the assignment with its actual orientation and position.

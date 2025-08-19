@@ -15,7 +15,7 @@
             "name": "Debug Bin Packing (step2)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/step2_container_box_placement_in_container.py",
+            "program": "${workspaceFolder}/step2_box_placement_in_container.py",
             "args": [
                 "inputs/step2_sample_packing_data_with_rotation.json"
             ],

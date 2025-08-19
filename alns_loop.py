@@ -1,6 +1,5 @@
 """
-ALNS framework for container loading using the official ALNS library.
-Refactored from custom ALNS loop to use alns library.
+ALNS loop for container loading using the official ALNS library.
 
 Loop summary (iterate):
     1) select (RouletteWheel) a destroy + repair pair (only one pair registered).
@@ -316,4 +315,3 @@ def run_alns_with_library(
         print(f'ALNS finished. Best aggregate_score={best_score}')
 
     return best_solution, result
-

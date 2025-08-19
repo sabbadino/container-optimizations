@@ -3,7 +3,7 @@ Shared CP-SAT assignment model for container loading (step 1 and ALNS repair)
 """
 from ortools.sat.python import cp_model
 
-def build_step1_assignment_model(items, container_size, container_weight, max_containers, group_to_items=None, fixed_assignments=None, group_penalty_lambda=1, volume_balance_lambda=0.1, dump_inputs=False):
+def build_step1_assignment_model(items, container_size, container_weight, max_containers, group_to_items=None, fixed_assignments=None, group_penalty_lambda=1.0, volume_balance_lambda=0.1, dump_inputs=False):
     """
         items: list of item dicts (must have 'id', 'size', 'weight', optional 'group_id')
         container_size: [L, W, H]

@@ -7,8 +7,8 @@ from ortools.sat.python import cp_model
 
 from assignment_model import build_step1_assignment_model
 from print_utils import dump_phase1_results
-from alns_container_loading_refactored import run_alns_with_library
-from step2_container_box_placement_in_container import run_phase_2
+from alns_loop import run_alns_with_library
+from step2_box_placement_in_container import run_phase_2
 from visualization_utils import visualize_solution
 
 def main():
@@ -88,9 +88,9 @@ def main():
 
     solver = cp_model.CpSolver()
     #solver.parameters.log_search_progress = args.verbose
-    max_time_in_seconds = data.get('max_time_in_seconds', 60)
-    print (f'Running phase 1 baseline with max_time_in_seconds {max_time_in_seconds}')
-    solver.parameters.max_time_in_seconds = max_time_in_seconds
+    phase1_time_limit = data.get('solver_phase1_max_time_in_seconds', 60)
+    print(f'Running Phase 1 baseline with time limit {phase1_time_limit} seconds')
+    solver.parameters.max_time_in_seconds = phase1_time_limit
     status = solver.Solve(model)
 
     dump_phase1_results(
@@ -138,7 +138,7 @@ def main():
                 initial_assignment,
                 {"size": container_size, "weight": container_weight},
                 step2_settings_file,
-                num_iterations, num_remove, time_limit, max_no_improve, max_time_in_seconds, verbose=args.verbose
+                num_iterations, num_remove, time_limit, max_no_improve, phase1_time_limit, verbose=args.verbose
             )
             # Extract best assignment and attach placements/status so orientations are present in the output
             best_assignment = best_state.assignment

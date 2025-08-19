@@ -36,7 +36,7 @@ def load_data_from_json(input_file):
     except Exception as e:
         raise RuntimeError(f"Unexpected error reading {input_file}: {e}")
     
-    # Validate required fields exist
+    # Validate required fields exist (core structural fields only)
     required_fields = ['container', 'boxes']
     missing_fields = [field for field in required_fields if field not in data]
     if missing_fields:
@@ -77,21 +77,34 @@ def load_data_from_json(input_file):
             # Validate weight
             if not isinstance(box['weight'], (int, float)) or box['weight'] < 0:
                 raise ValueError(f"Box {i} weight must be non-negative number")
+
+            # Validate rotation (required)
+            if 'rotation' not in box:
+                raise ValueError(f"Box {i} missing required field 'rotation'")
+            rot = box['rotation']
+            if rot not in ('none', 'z', 'free'):
+                raise ValueError(f"Box {i} invalid rotation '{rot}'. Must be one of ['none','z','free']")
         
     except (TypeError, ValueError) as e:
         raise ValueError(f"Invalid data format: {e}")
     
     # Extract optional parameters with validation
     try:
-        symmetry_mode = data.get('symmetry_mode', 'full')
-        # Accept legacy/test value 'simple' in addition to the standard ones
+        # symmetry_mode is required (no default). Accept legacy/test value 'simple' too
+        if 'symmetry_mode' not in data:
+            raise ValueError("Missing required field in JSON: 'symmetry_mode'")
+        symmetry_mode = data['symmetry_mode']
         valid_symmetry_modes = ['full', 'partial', 'none', 'simple']
         if symmetry_mode not in valid_symmetry_modes:
             raise ValueError(f"Invalid symmetry_mode: {symmetry_mode}. Must be one of {valid_symmetry_modes}")
-        
-        max_time_in_seconds = data.get('max_time_in_seconds', 60)
-        if not isinstance(max_time_in_seconds, (int, float)) or max_time_in_seconds <= 0:
-            raise ValueError("max_time_in_seconds must be a positive number")
+
+        # solver_phase1_max_time_in_seconds is required (no default).
+        if 'solver_phase1_max_time_in_seconds' in data:
+            solver_phase1_max_time_in_seconds = data['solver_phase1_max_time_in_seconds']
+        else:
+            raise ValueError("Missing required field in JSON: 'solver_phase1_max_time_in_seconds'")
+        if not isinstance(solver_phase1_max_time_in_seconds, (int, float)) or solver_phase1_max_time_in_seconds <= 0:
+            raise ValueError("solver_phase1_max_time_in_seconds must be a positive number")
         
         anchor_mode = data.get('anchor_mode', None)
         if anchor_mode is not None:
@@ -120,4 +133,4 @@ def load_data_from_json(input_file):
     except (TypeError, ValueError) as e:
         raise ValueError(f"Invalid configuration parameter: {e}")
     
-    return (container, boxes, symmetry_mode, max_time_in_seconds, anchor_mode, *extracted_weights)
+    return (container, boxes, symmetry_mode, solver_phase1_max_time_in_seconds, anchor_mode, *extracted_weights)

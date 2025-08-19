@@ -1,7 +1,6 @@
 import json
-import sys
 from ortools.sat.python import cp_model
-from load_utils import load_data_from_json
+
 
 def run_phase_2(container, boxes, settingsfile, verbose=True):
     """Run phase 2: place boxes inside a single container using CP-SAT.
@@ -44,7 +43,7 @@ def run_phase_2(container, boxes, settingsfile, verbose=True):
     container_size = container['size']
 
     symmetry_mode = data.get('symmetry_mode', 'full')
-    max_time_in_seconds = data.get('max_time_in_seconds', 60)
+    solver_phase2_max_time_in_seconds = data.get('solver_phase2_max_time_in_seconds', 60)
     anchor_mode = data.get('anchor_mode', None)
     prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight = data.get('prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight', 0)
     prefer_maximize_surface_contact_weight = data.get('prefer_maximize_surface_contact_weight', 0)
@@ -53,7 +52,7 @@ def run_phase_2(container, boxes, settingsfile, verbose=True):
     prefer_large_base_lower_non_linear_weight = data.get('prefer_large_base_lower_non_linear_weight', 0)  # default 0
     prefer_put_boxes_by_volume_lower_z_weight = data.get('prefer_put_boxes_by_volume_lower_z_weight', 0)  # default 0
     status_str, step2_results = run_inner(
-        container_size, boxes, symmetry_mode, max_time_in_seconds, anchor_mode,
+        container_size, boxes, symmetry_mode, solver_phase2_max_time_in_seconds, anchor_mode,
         prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight,
         prefer_maximize_surface_contact_weight,
         prefer_large_base_lower_weight,
@@ -63,7 +62,7 @@ def run_phase_2(container, boxes, settingsfile, verbose=True):
         verbose)
     return status_str, step2_results
 
-def run_inner(container, boxes, symmetry_mode, max_time, anchor_mode,     prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight,     prefer_maximize_surface_contact_weight,     prefer_large_base_lower_weight,     prefer_total_floor_area_weight,     prefer_large_base_lower_non_linear_weight,     prefer_put_boxes_by_volume_lower_z_weight,     verbose=False):
+def run_inner(container, boxes, symmetry_mode, solver_phase2_max_time_in_seconds, anchor_mode,     prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight,     prefer_maximize_surface_contact_weight,     prefer_large_base_lower_weight,     prefer_total_floor_area_weight,     prefer_large_base_lower_non_linear_weight,     prefer_put_boxes_by_volume_lower_z_weight,     verbose=False):
     """Builds and solves the 3D box placement CP-SAT model for one container.
 
     Sets up decision variables, hard constraints (inside container, no overlap,
@@ -72,9 +71,8 @@ def run_inner(container, boxes, symmetry_mode, max_time, anchor_mode,     prefer
     limit. Optionally visualizes the resulting placement.
 
     Note:
-        For cubic boxes (l == w == h), rotation is forced to 'fixed' on an
-        internal deep copy of the input boxes to reduce symmetry. The input
-        list is not mutated.
+        Rotation policy is taken from input (none|z|free). We no longer
+        override rotation for cubes; symmetry is handled via constraints.
 
     Args:
         container: Container size triple [L, W, H] consumed by the model setup.
@@ -82,7 +80,7 @@ def run_inner(container, boxes, symmetry_mode, max_time, anchor_mode,     prefer
             include 'rotation' to control allowed orientations.
         symmetry_mode: Symmetry breaking mode for identical boxes (e.g., 'full'
             or other supported modes).
-        max_time: Solver time limit in seconds.
+        solver_phase2_max_time_in_seconds: Solver time limit in seconds.
         anchor_mode: Optional anchoring strategy applied to some boxes
             (implementation-dependent, can be None).
         prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight:
@@ -120,12 +118,16 @@ def run_inner(container, boxes, symmetry_mode, max_time, anchor_mode,     prefer
         print(f'prefer_large_base_lower_non_linear_weight: {prefer_large_base_lower_non_linear_weight}')
         print(f'prefer_put_boxes_by_volume_lower_z_weight: {prefer_put_boxes_by_volume_lower_z_weight}')
 
-    # Work on a local deep copy of boxes: override rotation for cubes without mutating input
+    # Work on a local deep copy of boxes (do not mutate inputs)
     import copy as _copy
     boxes_local = _copy.deepcopy(boxes)
+    # Validate rotation values
     for i, item in enumerate(boxes_local):
-        if item['size'][0] == item['size'][1] == item['size'][2] and item.get('rotation') != 'fixed':
-            item['rotation'] = 'fixed'
+        if 'rotation' not in item:
+            raise ValueError(f"Box {item.get('id', i)} missing required field 'rotation'")
+        rot = item['rotation']
+        if rot not in ('none', 'z', 'free'):
+            raise ValueError(f"Invalid rotation value for box {item.get('id', i)}: {rot}. Must be one of ['none','z','free'].")
 
 
     model = cp_model.CpModel()
@@ -135,7 +137,6 @@ def run_inner(container, boxes, symmetry_mode, max_time, anchor_mode,     prefer
     solver = cp_model.CpSolver()
     #if verbose:
      #   solver.parameters.log_search_progress = True
-
 
 
 
@@ -198,23 +199,25 @@ def run_inner(container, boxes, symmetry_mode, max_time, anchor_mode,     prefer
 
 
     # Solve
-    print(f'run inner max_time_in_seconds {max_time}');
-    solver.parameters.max_time_in_seconds = max_time
-    print(f'Solver max_time_in_seconds: {max_time}')
+    solver.parameters.max_time_in_seconds = solver_phase2_max_time_in_seconds
+    print(f'Solver max_time_in_seconds: {solver_phase2_max_time_in_seconds}')
     start_time = time.time()
     status = solver.Solve(model)
     elapsed_time = time.time() - start_time
 
-    # Print model status
-    status_dict = {
-        cp_model.OPTIMAL: 'OPTIMAL',
-        cp_model.FEASIBLE: 'FEASIBLE',
-        cp_model.INFEASIBLE: 'INFEASIBLE',
-        cp_model.MODEL_INVALID: 'MODEL_INVALID',
-        cp_model.UNKNOWN: 'UNKNOWN',
-    }
-
-    status_str = status_dict.get(status, str(status))
+    # Print model status (if-elif avoids typing issues with Enum mapping)
+    if status == cp_model.OPTIMAL:
+        status_str = 'OPTIMAL'
+    elif status == cp_model.FEASIBLE:
+        status_str = 'FEASIBLE'
+    elif status == cp_model.INFEASIBLE:
+        status_str = 'INFEASIBLE'
+    elif status == cp_model.MODEL_INVALID:
+        status_str = 'MODEL_INVALID'
+    elif status == cp_model.UNKNOWN:
+        status_str = 'UNKNOWN'
+    else:
+        status_str = str(status)
     color_map = {
         'OPTIMAL': '\033[92m',      # Green
         'FEASIBLE': '\033[94m',     # Blue
@@ -238,7 +241,7 @@ def run_inner(container, boxes, symmetry_mode, max_time, anchor_mode,     prefer
             pos = (solver.Value(x[i]), solver.Value(y[i]), solver.Value(z[i])) if orient_idx is not None else (None, None, None)
             
             # Get effective rotation policy used by the model (from local copy)
-            current_rotation = boxes_local[i].get('rotation', 'free')
+            current_rotation = boxes_local[i]['rotation']
 
 # orient_idx            
 #0 → [L, W, H]
@@ -270,9 +273,3 @@ def run_inner(container, boxes, symmetry_mode, max_time, anchor_mode,     prefer
         'status_str': status_str,
     }
     return status_str, step2_results
-
-
-
-
-
-
