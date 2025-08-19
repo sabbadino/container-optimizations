@@ -1,20 +1,31 @@
 """
 Shared CP-SAT assignment model for container loading (step 1 and ALNS repair)
 """
+from typing import Any, Dict, List, Optional, Tuple
 from ortools.sat.python import cp_model
 
-def build_step1_model(items, container_size, container_weight, max_containers, group_to_items=None, fixed_assignments=None, group_penalty_lambda=1.0, volume_balance_lambda=0.1, dump_inputs=False):
+def build_step1_model(
+    items: List[Dict[str, Any]],
+    container_size: List[int],
+    container_weight: float,
+    max_containers: int,
+    group_to_items: Optional[Dict[Any, List[int]]] = None,
+    fixed_assignments: Optional[Dict[int, int]] = None,
+    group_penalty_lambda: float = 1.0,
+    volume_balance_lambda: float = 0.1,
+    dump_inputs: bool = False,
+):
     """
-        items: list of item dicts (must have 'id', 'size', 'weight', optional 'group_id')
-        container_size: [L, W, H]
-        container_weight: max weight per container
-        max_containers: int, upper bound on containers
-        group_to_items: dict mapping group_id to list of item indices (optional)
-        fixed_assignments: dict {item_id: container_idx} for items to fix (optional)
-        group_penalty_lambda: penalty weight for group splits
-        volume_balance_lambda: penalty weight for volume imbalance between containers
-        Returns: model, x, y, group_in_j, group_in_containers
-        """    
+    items: list of item dicts (must have 'id', 'size', 'weight', optional 'group_id')
+    container_size: [L, W, H]
+    container_weight: max weight per container
+    max_containers: int, upper bound on containers
+    group_to_items: dict mapping group_id to list of item indices (optional)
+    fixed_assignments: dict {item_id: container_idx} for items to fix (optional)
+    group_penalty_lambda: penalty weight for group splits
+    volume_balance_lambda: penalty weight for volume imbalance between containers
+    Returns: model, x, y, group_in_containers, group_ids
+    """
     if dump_inputs:
         print('****************')
         print('INPUTS')
@@ -29,17 +40,17 @@ def build_step1_model(items, container_size, container_weight, max_containers, g
             print(f'Counter {i} Item id {item["id"]}: weight={item["weight"]}, volume={volume}, rotation={rotation}, group_id={group_id}')
         print('****************')
     
-    model = cp_model.CpModel()
+    model: cp_model.CpModel = cp_model.CpModel()
     
-    num_items = len(items)
-    container_capacity_volume = container_size[0] * container_size[1] * container_size[2]
+    num_items: int = len(items)
+    container_capacity_volume: int = container_size[0] * container_size[1] * container_size[2]
     
     # Variables
-    x = {}  # x[i, j] = 1 if item i in container j
+    x: Dict[Tuple[int, int], cp_model.IntVar] = {}  # BoolVar; x[i, j] = 1 if item i in container j
     for i in range(num_items):
         for j in range(max_containers):
             x[i, j] = model.NewBoolVar(f'x_{i}_{j}')
-    y = [model.NewBoolVar(f'y_{j}') for j in range(max_containers)]
+    y: List[cp_model.IntVar] = [model.NewBoolVar(f'y_{j}') for j in range(max_containers)]
     # Constraints
     for i in range(num_items):
         if fixed_assignments and items[i]['id'] in fixed_assignments:
@@ -59,10 +70,11 @@ def build_step1_model(items, container_size, container_weight, max_containers, g
         for i in range(num_items):
             model.Add(x[i, j] <= y[j])
     # Soft grouping
-    group_in_j = {}  # No longer used, will be removed
-    group_in_containers = {}
-    group_ids = list(group_to_items.keys()) if group_to_items else []
+    group_in_j: Dict[Tuple[Any, int], cp_model.IntVar] = {}  # kept for readability
+    group_in_containers: Dict[Any, cp_model.IntVar] = {}
+    group_ids: List[Any] = list(group_to_items.keys()) if group_to_items else []
     if group_ids:
+        assert group_to_items is not None
         for g in group_ids:
             for j in range(max_containers):
                 group_in_j[g, j] = model.NewBoolVar(f'group_{g}_in_{j}')
@@ -72,7 +84,7 @@ def build_step1_model(items, container_size, container_weight, max_containers, g
             model.Add(group_in_containers[g] == sum(group_in_j[g, j] for j in range(max_containers)))
     
     # Volume balance variables and constraints (Pairwise approach)
-    container_volume_used = {}
+    container_volume_used: Dict[int, cp_model.IntVar] = {}
     for j in range(max_containers):
         container_volume_used[j] = model.NewIntVar(0, container_capacity_volume, f'vol_used_{j}')
         model.Add(container_volume_used[j] == sum(
@@ -81,7 +93,7 @@ def build_step1_model(items, container_size, container_weight, max_containers, g
         ))
     
     # Pairwise volume balance penalties
-    pairwise_penalties = []
+    pairwise_penalties: List[cp_model.IntVar] = []
     for j1 in range(max_containers):
         for j2 in range(j1 + 1, max_containers):
             diff_var = model.NewIntVar(0, container_capacity_volume, f'diff_{j1}_{j2}')

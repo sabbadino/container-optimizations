@@ -1,13 +1,14 @@
 import time
+from typing import Any, Callable, Iterable
 
 
 class CombinedStoppingCriterion:
     """Combines multiple stopping criteria - stops when ANY criterion is met."""
 
-    def __init__(self, *criteria):
+    def __init__(self, *criteria: Callable[[Any, Any, Any], bool]):
         self.criteria = criteria
 
-    def __call__(self, rng, best, current):
+    def __call__(self, rng: Any, best: Any, current: Any) -> bool:
         """Return True if any of the criteria say to stop."""
         return any(criterion(rng, best, current) for criterion in self.criteria)
 
@@ -22,7 +23,7 @@ class StoppingCriterionWithProgress:
         - no-improvement iterations >= max_no_improve
     """
 
-    def __init__(self, max_iterations, max_no_improve, time_limit):
+    def __init__(self, max_iterations: int, max_no_improve: int, time_limit: float):
         if time_limit is None:
             raise ValueError("time_limit must be provided (seconds) and cannot be None")
         self.max_iterations = int(max_iterations)
@@ -33,7 +34,7 @@ class StoppingCriterionWithProgress:
         self.no_improve = 0
         self._last_best_obj = float("inf")
 
-    def __call__(self, rng, best, current):
+    def __call__(self, rng: Any, best: Any, current: Any) -> bool:
         # Time-based stopping (checked first)
         elapsed = time.time() - self.start_time
         if elapsed >= self.time_limit:

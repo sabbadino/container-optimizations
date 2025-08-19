@@ -1,4 +1,39 @@
-def visualize_solution(time_taken, container, boxes, placements, status_str=None):
+from __future__ import annotations
+
+from types import ModuleType
+from typing import Any, Dict, Optional, Sequence, Tuple, Union, Literal, TypedDict, Required, NotRequired, cast
+
+
+# Lightweight, runtime-safe shapes for inputs
+class ContainerDict(TypedDict):
+    size: Tuple[float, float, float]
+    id: NotRequired[Union[str, int]]
+
+
+class BoxDict(TypedDict):
+    size: Tuple[float, float, float]
+    id: NotRequired[Union[str, int]]
+    # rotation allowed for the box when placed
+    rotation: NotRequired[Literal["none", "z", "free"]]
+
+
+class PlacementDict(TypedDict):
+    position: Tuple[float, float, float]
+    orientation: Optional[int]
+    size: Tuple[float, float, float]
+    rotation_type: NotRequired[Literal["none", "z", "free"]]
+
+
+ContainerLike = Union[Tuple[float, float, float], ContainerDict]
+
+
+def visualize_solution(
+    time_taken: Optional[float],
+    container: ContainerLike,
+    boxes: Sequence[BoxDict],
+    placements: Sequence[PlacementDict],
+    status_str: Optional[str] = None,
+) -> ModuleType:
     """Render a 3D visualization of the container and placed boxes.
 
     Args:
@@ -31,10 +66,12 @@ def visualize_solution(time_taken, container, boxes, placements, status_str=None
         sys.exit(0)
 
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    # Precise type for 3D axes for better static typing
+    from mpl_toolkits.mplot3d.axes3d import Axes3D as Axes3DType  # type: ignore
+    ax = cast(Axes3DType, fig.add_subplot(111, projection='3d'))
 
     # Normalize container input and draw container as wireframe
-    container_id_val = None
+    container_id_val: Optional[Union[str, int]] = None
     if isinstance(container, dict):
         size = container.get('size')
         if size is None:
@@ -51,7 +88,11 @@ def visualize_solution(time_taken, container, boxes, placements, status_str=None
         ax.plot3D(*zip(s, e), color="black", linewidth=0.5)
 
     # Helper: map orientation index to (l,w,h) perm without needing perms_list
-    def _orientation_to_perm(size, orient_idx, rotation_type):
+    def _orientation_to_perm(
+        size: Tuple[float, float, float],
+        orient_idx: Optional[int],
+        rotation_type: Literal["none", "z", "free"],
+    ) -> Optional[Tuple[float, float, float]]:
         l0, w0, h0 = size
         if rotation_type == "none":
             mapping = [(l0, w0, h0)]
@@ -111,9 +152,10 @@ def visualize_solution(time_taken, container, boxes, placements, status_str=None
         center_y = yi + w / 2
         center_z = zi + h / 2
         # Compute perm from orientation + rotation_type
-        rotation_type = placement.get('rotation_type', boxes[i].get('rotation'))
-        if rotation_type not in ('none','z','free'):
-            raise ValueError(f"Invalid or missing rotation_type for placement/box {placements[i].get('id', i)}: {rotation_type}")
+        rt_candidate = placement.get('rotation_type') or boxes[i].get('rotation')
+        if rt_candidate not in ('none','z','free'):
+            raise ValueError(f"Invalid or missing rotation_type for placement/box {placements[i].get('id', i)}: {rt_candidate}")
+        rotation_type: Literal['none','z','free'] = rt_candidate  # type: ignore[assignment]
         perm = _orientation_to_perm(boxes[i]['size'], orient_idx, rotation_type)
         if perm is None:
             perm = (l, w, h)  # last resort: use effective size
@@ -140,7 +182,7 @@ def visualize_solution(time_taken, container, boxes, placements, status_str=None
     ax.set_xlim(0, cx)
     ax.set_ylim(0, cy)
     ax.set_zlim(0, cz)
-    ax.set_box_aspect([cx, cy, cz])
+    ax.set_box_aspect([cx, cy, cz])  # type: ignore[arg-type]
     title = '3D Container Packing Solution'
     if container_id_val is not None:
         title += f' (Container Id: {container_id_val})'

@@ -250,11 +250,11 @@ This section clarifies the data/control flow inside the ALNS iterate loop and ho
 - Evaluation (objective of the candidate)
   - ALNS queries `candidate.objective()`. If the cached flag is false, `ContainerLoadingState.evaluate()` runs Phase‑2 per container by calling `run_phase_2(container_dict, boxes, step2_settings_file, verbose)`.
   - For each container, it records `status_str` and placements; it copies back `final_position` and `final_orientation` to each box, then computes
-    `aggregate_score = 1000 * count('UNFEASIBLE') + 500 * count('UNKNOWN') - 2 * count('OPTIMAL') - 1 * count('FEASIBLE')`.
+  `aggregate_score = 1000 * count('INFEASIBLE') + 500 * count('UNKNOWN') - 2 * count('OPTIMAL') - 1 * count('FEASIBLE')`.
   - Since the ALNS library expects minimization, lower `aggregate_score` is better.
 
 - Acceptance decision
-  - `CustomContainerAcceptance.__call__(rng, best, current, candidate)` rejects immediately if `candidate.is_feasible()` is false (i.e., any container has status `'UNFEASIBLE'`).
+  - `CustomContainerAcceptance.__call__(rng, best, current, candidate)` rejects immediately if `candidate.is_feasible()` is false (i.e., any container has status `'INFEASIBLE'`).
   - Otherwise accept if `candidate.objective() < best.objective()` (strict improvement) or with 5% random chance. This enables occasional uphill moves.
 
 - Book‑keeping and stopping
@@ -276,7 +276,7 @@ This section clarifies the data/control flow inside the ALNS iterate loop and ho
   - Destroy mutates only a copy; it adds `state._removed_items` for the repair.
   - Repair uses Step‑1 CP‑SAT (`build_step1_step1_model_builder`) with `fixed_assignments` and `group_to_items`; solve time is bounded by `phase1_time_limit`.
 - Objective/feasibility
-  - `objective()` calls `evaluate()` and caches `aggregate_score`; `is_feasible()` is `statuses` ∉ {'UNFEASIBLE'}.
+  - `objective()` calls `evaluate()` and caches `aggregate_score`; `is_feasible()` is `statuses` ∉ {'INFEASIBLE'}.
 
 References
 
@@ -329,12 +329,12 @@ References
 
 - Feasibility statuses used by ALNS scoring:
   - OPTIMAL, FEASIBLE: counted as bonuses
-  - UNFEASIBLE: heavy penalty (any UNFEASIBLE makes the candidate rejected by acceptance)
+  - INFEASIBLE: heavy penalty (any INFEASIBLE makes the candidate rejected by acceptance)
   - UNKNOWN: moderate penalty
 - Aggregate score (minimized by ALNS):
-  - score = 1000 · count(UNFEASIBLE) + 500 · count(UNKNOWN) − 2 · count(OPTIMAL) − 1 · count(FEASIBLE)
+  - score = 1000 · count(INFEASIBLE) + 500 · count(UNKNOWN) − 2 · count(OPTIMAL) − 1 · count(FEASIBLE)
   - Lower is better. A strictly lower score is required for deterministic acceptance (5% random chance can accept otherwise).
-- Practical note: Phase‑2 may return various strings; ALNS logic specifically checks for 'UNFEASIBLE' to define infeasibility.
+- Practical note: Phase‑2 returns cp_model strings; ALNS logic checks for 'INFEASIBLE' to define infeasibility.
 
 
 ## 7) Visualization

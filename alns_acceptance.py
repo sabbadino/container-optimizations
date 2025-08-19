@@ -1,3 +1,6 @@
+from typing import Any
+
+
 class CustomContainerAcceptance:
     """
     Custom acceptance criterion that mimics the original acceptance_criteria function.
@@ -5,7 +8,7 @@ class CustomContainerAcceptance:
     or with a 5% random chance.
     """
 
-    def __call__(self, rng, best, current, candidate):
+    def __call__(self, rng: Any, best: Any, current: Any, candidate: Any) -> bool:
         """
         ALNS acceptance criterion interface.
 

@@ -18,12 +18,18 @@ from collections import defaultdict
 # ALNS library imports
 from alns import ALNS
 from alns.select import RouletteWheel
+from typing import Any, Callable, Dict, List, cast
 
 import numpy as np
 import numpy.random as rnd
 
 # Local modules
-from container_loading_state import ContainerLoadingState
+from container_loading_state import (
+    ContainerLoadingState,
+    Assignment,
+    ContainerSpec,
+    Box,
+)
 from alns_criteria import StoppingCriterionWithProgress
 from alns_acceptance import CustomContainerAcceptance
 
@@ -33,7 +39,7 @@ from print_utils import dump_phase1_results
 
 
 # --- ALNS Destroy Operator ---
-def create_destroy_random_items(num_remove):
+def create_destroy_random_items(num_remove: int):
     """
         Factory for a destroy operator that removes up to `num_remove` items.
 
@@ -43,13 +49,15 @@ def create_destroy_random_items(num_remove):
         - Side-effects on returned state: sets `_removed_items` list and
             `_objective_computed=False` to force re-evaluation when needed.
     """
-    def destroy_random_items(state, rng, **kwargs):
+    def destroy_random_items(
+        state: Any, rng: np.random.Generator, **kwargs: Any
+    ) -> Any:
         """
         ALNS destroy operator: Randomly select items and unassign them from their containers.
         Returns a new partial assignment (deep copy with some boxes removed).
         """
         # Create a deep copy first (required by ALNS)
-        destroyed_state = state.copy()
+        destroyed_state: ContainerLoadingState = cast(ContainerLoadingState, state).copy()
 
         # Flatten all boxes with their container index
         all_boxes = [
@@ -65,7 +73,7 @@ def create_destroy_random_items(num_remove):
         remove_count = min(num_remove, len(all_boxes))
         remove_indices = rng.choice(len(all_boxes), remove_count, replace=False)
 
-        removed_items = []
+        removed_items: List[Box] = []
         for idx in remove_indices:
             c_idx, box_idx = all_boxes[idx]
             removed_items.append(destroyed_state.assignment[c_idx]['boxes'][box_idx])
@@ -90,7 +98,7 @@ def create_destroy_random_items(num_remove):
 
 
 # --- ALNS Repair Operator ---
-def create_repair_cpsat(max_time_in_seconds):
+def create_repair_cpsat(max_time_in_seconds: float):
     """
         Factory for a repair operator that uses CP-SAT Step-1 to reassign removed items.
 
@@ -102,21 +110,23 @@ def create_repair_cpsat(max_time_in_seconds):
         - Output: new ContainerLoadingState with a full, repaired assignment.
     """
 
-    def repair_cpsat(state, rng, **kwargs):
+    def repair_cpsat(
+        state: Any, rng: np.random.Generator, **kwargs: Any
+    ) -> Any:
         """
         ALNS repair operator: Use CP-SAT to optimally reassign removed items.
         Returns a new complete assignment.
         """
         # Get removed items from the destroyed state
-        destroyed = state
-        removed_items = getattr(destroyed, '_removed_items', [])
+        destroyed: ContainerLoadingState = cast(ContainerLoadingState, state)
+        removed_items: List[Box] = getattr(destroyed, '_removed_items', [])
         if not removed_items:
             # Nothing to repair
             return destroyed
 
         # Prepare items: combine removed_items and fixed items
-        all_items = []
-        item_id_to_idx = {}
+        all_items: List[Dict[str, Any]] = []
+        item_id_to_idx: Dict[int, int] = {}
 
         # Add removed items first
         for i, item in enumerate(removed_items):
@@ -132,11 +142,11 @@ def create_repair_cpsat(max_time_in_seconds):
             item_id_to_idx[item['id']] = i
 
         # Add fixed items (from partial_assignment)
-        fixed_assignments = {}
-        fixed_item_ids = set()
+        fixed_assignments: Dict[int, int] = {}
+        fixed_item_ids: set[int] = set()
 
         # Build container mapping: original container id -> zero-based index for CP-SAT
-        container_id_to_cpsat_idx = {}
+        container_id_to_cpsat_idx: Dict[int, int] = {}
         for cpsat_idx, container in enumerate(destroyed.assignment):
             container_id_to_cpsat_idx[container['id']] = cpsat_idx
 
@@ -159,20 +169,20 @@ def create_repair_cpsat(max_time_in_seconds):
                 fixed_item_ids.add(box['id'])
 
         # Build group_to_items mapping
-        group_to_items = defaultdict(list)
+        group_to_items: Dict[Any, List[int]] = defaultdict(list)
         for idx, item in enumerate(all_items):
             gid = item.get('group_id')
             if gid is not None:
                 group_to_items[gid].append(idx)
 
         # Container count: allow new containers for removed items
-        max_containers = len(destroyed.assignment) + len(removed_items)
+        max_containers: int = len(destroyed.assignment) + len(removed_items)
 
         # Get container weight from the state
         container_weight = destroyed.container_weight
 
         # Build model
-        group_penalty_lambda = 1
+        group_penalty_lambda: int = 1
         model, x, y, group_in_containers, group_ids = build_step1_model(
             all_items,
             destroyed.container_size,
@@ -207,8 +217,8 @@ def create_repair_cpsat(max_time_in_seconds):
         )
 
         # Build new assignment structure - use sequential container IDs
-        new_assignment = []
-        used_cpsat_indices = [j for j in range(max_containers) if solver.Value(y[j])]
+        new_assignment: Assignment = []
+        used_cpsat_indices: List[int] = [j for j in range(max_containers) if solver.Value(y[j])]
 
         for cpsat_idx in used_cpsat_indices:
             new_assignment.append(
@@ -221,7 +231,7 @@ def create_repair_cpsat(max_time_in_seconds):
                 if solver.Value(x[i, cpsat_idx]):
                     # Find which new_assignment container corresponds to this cpsat_idx
                     new_container_idx = used_cpsat_indices.index(cpsat_idx)
-                    new_assignment[new_container_idx]['boxes'].append(all_items[i])
+                    new_assignment[new_container_idx]['boxes'].append(cast(Box, all_items[i]))
                     break
 
         # Create new state with repaired assignment
@@ -235,17 +245,17 @@ def create_repair_cpsat(max_time_in_seconds):
 
 # --- Main ALNS Function ---
 def run_alns_with_library(
-    initial_assignment,
-    container,
-    step2_settings_file,
-    num_iterations,
-    num_remove,
-    time_limit,
-    max_no_improve,
-    phase1_time_limit=60,
-    seed=42,
-    verbose=False,
-):
+    initial_assignment: Assignment,
+    container: ContainerSpec,
+    step2_settings_file: str,
+    num_iterations: int,
+    num_remove: int,
+    time_limit: float,
+    max_no_improve: int,
+    phase1_time_limit: float = 60,
+    seed: int = 42,
+    verbose: bool = False,
+) -> ContainerLoadingState:
     """
     Run ALNS using the official ALNS library.
 
@@ -262,7 +272,6 @@ def run_alns_with_library(
 
     Returns:
         best_solution: ContainerLoadingState
-        result: ALNS result object with statistics
     """
     # Convert relative path to absolute path for step2_settings_file
     if not os.path.isabs(step2_settings_file):
@@ -284,8 +293,8 @@ def run_alns_with_library(
     alns = ALNS(np.random.default_rng(seed=seed))
 
     # Add destroy and repair operators
-    alns.add_destroy_operator(create_destroy_random_items(num_remove))
-    alns.add_repair_operator(create_repair_cpsat(phase1_time_limit))
+    alns.add_destroy_operator(cast(Any, create_destroy_random_items(num_remove)))
+    alns.add_repair_operator(cast(Any, create_repair_cpsat(phase1_time_limit)))
 
     # Selection, acceptance, and stopping criteria
 
@@ -306,7 +315,8 @@ def run_alns_with_library(
     # Note: time_limit can also be enforced via a separate stopping criterion if needed
 
     result = alns.iterate(initial_state, select, accept, stop)
-    best_solution = result.best_state
+    # ALNS returns a generic State; cast to our domain state for type-checkers
+    best_solution = cast(ContainerLoadingState, result.best_state)
     best_score = best_solution.objective()
     statuses = getattr(best_solution, 'statuses', None)
     if statuses is not None:
@@ -314,4 +324,4 @@ def run_alns_with_library(
     else:
         print(f'ALNS finished. Best aggregate_score={best_score}')
 
-    return best_solution, result
+    return best_solution

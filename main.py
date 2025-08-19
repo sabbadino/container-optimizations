@@ -8,6 +8,9 @@ from ortools.sat.python import cp_model
 from step1_model_builder import build_step1_model
 from print_utils import dump_phase1_results
 from alns_loop import run_alns_with_library
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from container_loading_state import ContainerLoadingState
 from step2_box_placement_in_container import run_phase_2
 from visualization_utils import visualize_solution
 
@@ -134,7 +137,7 @@ def main():
             num_remove = max(1, int(len(items) * num_can_be_moved_percentage / 100))
 
             # Run ALNS; it evaluates step 2 internally and stores placements per container
-            best_state, _ = run_alns_with_library(
+            best_state: "ContainerLoadingState" = run_alns_with_library(
                 initial_assignment,
                 {"size": container_size, "weight": container_weight},
                 step2_settings_file,
