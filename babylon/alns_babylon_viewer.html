@@ -38,27 +38,27 @@
     "id": 1,
     "size": [10, 10, 10],
     "placements": [
-      {"id":16,"position":[0,0,0],"orientation":0,"size":[5,5,5],"rotation_type":"fixed"},
+      {"id":16,"position":[0,0,0],"orientation":0,"size":[5,5,5],"rotation_type":"none"},
       {"id":17,"position":[7,5,3],"orientation":2,"size":[2,2,3],"rotation_type":"free"},
-      {"id":18,"position":[0,5,0],"orientation":0,"size":[5,5,5],"rotation_type":"fixed"},
-      {"id":19,"position":[5,8,2],"orientation":0,"size":[2,2,2],"rotation_type":"fixed"},
-      {"id":20,"position":[5,0,0],"orientation":0,"size":[5,5,5],"rotation_type":"fixed"},
-      {"id":26,"position":[5,5,2],"orientation":0,"size":[1,1,1],"rotation_type":"fixed"},
-      {"id":33,"position":[5,9,4],"orientation":0,"size":[1,1,1],"rotation_type":"fixed"},
-      {"id":34,"position":[5,8,4],"orientation":0,"size":[1,1,1],"rotation_type":"fixed"},
-      {"id":36,"position":[7,7,3],"orientation":0,"size":[3,3,3],"rotation_type":"fixed"},
+      {"id":18,"position":[0,5,0],"orientation":0,"size":[5,5,5],"rotation_type":"none"},
+      {"id":19,"position":[5,8,2],"orientation":0,"size":[2,2,2],"rotation_type":"none"},
+      {"id":20,"position":[5,0,0],"orientation":0,"size":[5,5,5],"rotation_type":"z"},
+      {"id":26,"position":[5,5,2],"orientation":0,"size":[1,1,1],"rotation_type":"none"},
+      {"id":33,"position":[5,9,4],"orientation":0,"size":[1,1,1],"rotation_type":"none"},
+      {"id":34,"position":[5,8,4],"orientation":0,"size":[1,1,1],"rotation_type":"none"},
+      {"id":36,"position":[7,7,3],"orientation":0,"size":[3,3,3],"rotation_type":"none"},
       {"id":37,"position":[9,5,4],"orientation":3,"size":[1,2,2],"rotation_type":"free"},
-      {"id":38,"position":[6,9,4],"orientation":0,"size":[1,1,1],"rotation_type":"fixed"},
+      {"id":38,"position":[6,9,4],"orientation":0,"size":[1,1,1],"rotation_type":"none"},
       {"id":40,"position":[7,8,0],"orientation":3,"size":[3,2,3],"rotation_type":"free"},
-      {"id":42,"position":[6,5,2],"orientation":0,"size":[1,1,1],"rotation_type":"fixed"},
+      {"id":42,"position":[6,5,2],"orientation":0,"size":[1,1,1],"rotation_type":"z"},
       {"id":43,"position":[5,6,0],"orientation":5,"size":[2,2,3],"rotation_type":"free"},
-      {"id":48,"position":[7,5,0],"orientation":0,"size":[3,3,3],"rotation_type":"fixed"},
+      {"id":48,"position":[7,5,0],"orientation":0,"size":[3,3,3],"rotation_type":"none"},
       {"id":49,"position":[5,5,0],"orientation":3,"size":[2,1,2],"rotation_type":"free"},
-      {"id":50,"position":[9,5,3],"orientation":0,"size":[1,1,1],"rotation_type":"fixed"},
+      {"id":50,"position":[9,5,3],"orientation":0,"size":[1,1,1],"rotation_type":"z"},
       {"id":54,"position":[6,8,4],"orientation":5,"size":[1,1,2],"rotation_type":"free"},
       {"id":56,"position":[5,5,3],"orientation":1,"size":[2,3,3],"rotation_type":"free"},
-      {"id":58,"position":[9,6,3],"orientation":0,"size":[1,1,1],"rotation_type":"fixed"},
-      {"id":63,"position":[5,8,0],"orientation":0,"size":[2,2,2],"rotation_type":"fixed"}
+      {"id":58,"position":[9,6,3],"orientation":0,"size":[1,1,1],"rotation_type":"none"},
+      {"id":63,"position":[5,8,0],"orientation":0,"size":[2,2,2],"rotation_type":"z"}
     ],
     "status":"FEASIBLE"
   }
@@ -206,7 +206,7 @@
         return mat;
       }
 
-      for (const p of placements) {
+    for (const p of placements) {
         const [l, w, h] = p.size; // oriented sizes in L,W,H
         const mesh = BABYLON.MeshBuilder.CreateBox(`box-${p.id}` , {
           width: l,   // X
@@ -220,7 +220,7 @@
         mesh.enableEdgesRendering();
         mesh.edgesWidth = 1.0;
         mesh.edgesColor = new BABYLON.Color4(0,0,0,0.85);
-  mesh.metadata = { id: p.id, size: [l,w,h], pos: p.position };
+  mesh.metadata = { id: p.id, size: [l,w,h], pos: p.position, rotation_type: (p.rotation_type || 'fixed') };
       }
 
       // Frame camera to container
@@ -313,13 +313,14 @@
         }
       });
 
-      // Hover tooltip in console
+  // Hover tooltip in console
       scene.onPointerObservable.add((pointerInfo) => {
         if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERMOVE) {
           const pick = scene.pick(scene.pointerX, scene.pointerY);
           if (pick?.hit && pick.pickedMesh && pick.pickedMesh.metadata?.id) {
             const md = pick.pickedMesh.metadata;
-            updateInfo(`Box ${md.id}${md.groupId !== undefined ? ' (group ' + md.groupId + ')' : ''} • size ${md.size.join('x')} @ [${md.pos.join(', ')}]`);
+    const rt = md.rotation_type ? ` • rot ${String(md.rotation_type)}` : '';
+    updateInfo(`Box ${md.id}${md.groupId !== undefined ? ' (group ' + md.groupId + ')' : ''} • size ${md.size.join('x')} @ [${md.pos.join(', ')}]${rt}`);
           }
         }
       });
@@ -350,8 +351,8 @@
         return;
       }
       engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, antialias: true });
-      scene = createScene();
-      wireUi();
+  scene = createScene();
+  wireUi();
 
       try {
   const embedded = document.getElementById('alns-data').textContent;
@@ -363,7 +364,9 @@
         updateInfo('Failed to parse embedded data');
       }
 
-      engine.runRenderLoop(() => scene.render());
+  // Start clamp loop to keep moved meshes inside container
+  startClampLoop();
+  engine.runRenderLoop(() => scene.render());
       window.addEventListener('resize', () => engine.resize());
     }
 
@@ -398,7 +401,20 @@
       currentTool = mode;
       if (!gizmoManager) return;
       gizmoManager.positionGizmoEnabled = mode === 'move';
-      gizmoManager.rotationGizmoEnabled = mode === 'rotate';
+      if (mode === 'rotate') {
+        // Enable rotation based on selected mesh rotation_type
+        const rt = getSelectedRotationType();
+        if (rt === 'none' || rt === 'fixed') {
+          gizmoManager.rotationGizmoEnabled = false;
+          updateInfo('Rotation disabled for this box');
+        } else {
+          gizmoManager.rotationGizmoEnabled = true;
+          ensureGizmoObservables();
+          configureRotationGizmoForMesh(selectedMesh, rt);
+        }
+      } else {
+        gizmoManager.rotationGizmoEnabled = false;
+      }
   // Make sure observables are set when gizmos are created on-demand
   ensureGizmoObservables();
     }
@@ -411,6 +427,11 @@
       if (gizmoManager) gizmoManager.attachToMesh(mesh);
       // Respect current tool
       setTool(currentTool);
+      // If rotate tool is active, make sure gizmo axes respect rotation_type
+      if (currentTool === 'rotate') {
+        const rt = getSelectedRotationType();
+        configureRotationGizmoForMesh(selectedMesh, rt);
+      }
     }
 
     function deselectMesh() {
@@ -467,6 +488,13 @@
       if (!selectedMesh) return;
   // Quantize rotation to nearest 90° per axis before validation
   quantizeRotationToRightAngles(selectedMesh);
+      // Enforce rotation_type constraints
+      const violation = violatesRotationConstraint(selectedMesh, lastValidTransform);
+      if (violation) {
+        restoreLastTransform();
+        updateInfo(`Rotate invalid (${violation}). Reverting.`);
+        return;
+      }
       // If overlaps with any other box, revert
       const overlapWith = intersectsAnyBox(selectedMesh);
       if (overlapWith) {
@@ -568,6 +596,67 @@
         mesh.rotation.z = snapAngle(mesh.rotation.z, step);
       }
       mesh.computeWorldMatrix(true);
+    }
+
+    function getSelectedRotationType() {
+      const rt = selectedMesh?.metadata?.rotation_type;
+      return typeof rt === 'string' ? rt.toLowerCase() : 'fixed';
+    }
+
+    function configureRotationGizmoForMesh(mesh, rotationType) {
+      if (!mesh || !gizmoManager?.gizmos?.rotationGizmo) return;
+      const rt = (rotationType || mesh.metadata?.rotation_type || 'fixed').toLowerCase();
+      const rg = gizmoManager.gizmos.rotationGizmo;
+      const enableAxis = (axis, on) => {
+        try { if (axis) axis.isEnabled = !!on; } catch {}
+      };
+      if (rt === 'none' || rt === 'fixed') {
+        // No rotation allowed
+        enableAxis(rg.xGizmo, false);
+        enableAxis(rg.yGizmo, false);
+        enableAxis(rg.zGizmo, false);
+      } else if (rt === 'z') {
+        // Only Z (up) axis rotation
+        enableAxis(rg.xGizmo, false);
+        enableAxis(rg.yGizmo, false);
+        enableAxis(rg.zGizmo, true);
+      } else {
+        // free: all axes
+        enableAxis(rg.xGizmo, true);
+        enableAxis(rg.yGizmo, true);
+        enableAxis(rg.zGizmo, true);
+      }
+    }
+
+    function rotationToEuler(mesh) {
+      if (!mesh) return { x: 0, y: 0, z: 0 };
+      if (mesh.rotationQuaternion) {
+        const e = mesh.rotationQuaternion.toEulerAngles();
+        return { x: e.x, y: e.y, z: e.z };
+      }
+      return { x: mesh.rotation.x, y: mesh.rotation.y, z: mesh.rotation.z };
+    }
+
+    function violatesRotationConstraint(mesh, fromTransform) {
+      const rt = (mesh?.metadata?.rotation_type || 'fixed').toLowerCase();
+      if (!fromTransform || (rt !== 'none' && rt !== 'fixed' && rt !== 'z')) return null;
+      const step = Math.PI / 2;
+      const cur = rotationToEuler(mesh);
+      const was = fromTransform.rotation instanceof BABYLON.Quaternion
+        ? fromTransform.rotation.toEulerAngles()
+        : fromTransform.rotation;
+      // Quantize for robust comparison
+      const curQ = { x: snapAngle(cur.x, step), y: snapAngle(cur.y, step), z: snapAngle(cur.z, step) };
+      const wasQ = { x: snapAngle(was.x, step), y: snapAngle(was.y, step), z: snapAngle(was.z, step) };
+      const changedX = Math.abs(curQ.x - wasQ.x) > 1e-6;
+      const changedY = Math.abs(curQ.y - wasQ.y) > 1e-6;
+      const changedZ = Math.abs(curQ.z - wasQ.z) > 1e-6;
+      if (rt === 'none' || rt === 'fixed') {
+        if (changedX || changedY || changedZ) return 'rotation locked';
+      } else if (rt === 'z') {
+        if (changedX || changedY) return 'only Z-axis rotation allowed';
+      }
+      return null;
     }
 
     function disposeAxes() {

@@ -51,7 +51,7 @@
           2,
           3
         ],
-        "rotation_type": "none",
+        "rotation_type": "free",
         "final_orientation_desc": "L,W,H"
       }
     ],
