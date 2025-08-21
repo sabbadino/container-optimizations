@@ -169,19 +169,7 @@ def main():
                 print("matplotlib not available; skipping ALNS visualization.")
             except Exception as e:
                 print(f"Visualization error: {e}")
-
-            # Propagate placement info to boxes and add final_orientation_desc
-            for c_idx, container in enumerate(best_assignment):
-                boxes_in_container = container.get('boxes', []) or []
-                placements = container.get('placements', []) or []
-                placement_by_id = {p.get('id'): p for p in placements}
-                for b in boxes_in_container:
-                    p = placement_by_id.get(b.get('id'))
-                    if p:
-                        b['final_position'] = p.get('position')
-                        b['final_orientation'] = p.get('orientation')
-                    if 'final_orientation' in b and b.get('final_orientation') is not None:
-                        b['final_orientation_desc'] = _orientation_desc(b.get('final_orientation'))
+           
     else:
         print("\n--- Skipping ALNS Refinement Step ---")
 
@@ -190,7 +178,6 @@ def main():
     # If ALNS was skipped, we still need to run Phase 2 on the initial assignment.
     if args.no_alns:
         print("\n--- Phase 2: Running 3D Placement on Initial Assignment ---")
-        final_placements = []
         step2_settings_file = data.get('step2_settings_file')
         if not step2_settings_file:
             print("Error: 'step2_settings_file' not found. Cannot run Phase 2.", file=sys.stderr)
@@ -227,17 +214,13 @@ def main():
                 print("matplotlib not available; skipping Phase 2 visualization.")
             except Exception as e:
                 print(f"Visualization error: {e}")
-            # Propagate final_* fields to boxes so orientation/position/size are at box level
-            placement_by_id = {p.get('id'): p for p in placements}
-            for b in boxes_in_container:
-                p = placement_by_id.get(b.get('id'))
-                if p:
-                    b['final_position'] = p.get('position')
-                    b['final_orientation'] = p.get('orientation')
-                if 'final_orientation' in b and b.get('final_orientation') is not None:
-                    b['final_orientation_desc'] = _orientation_desc(b.get('final_orientation'))
-            final_placements.append(container_to_pack)
-        best_assignment = final_placements
+           
+        # Add rotation description to each placement before saving output
+        for container in best_assignment:
+            placements = container.get('placements', [])
+            for placement in placements:
+                rotation_idx = placement.get('rotation_idx')
+                placement['rotation_desc'] = _orientation_desc(rotation_idx)
 
     # --- 5. Save Output ---
     print(f"\n--- Saving Final Solution to {args.output} ---")
@@ -245,15 +228,15 @@ def main():
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
 
-    # Ensure final_orientation_desc is present when final_orientation exists
+  
+    # Remove 'boxes' from each container before saving output
+    output_assignment = []
     for container in best_assignment:
-        for b in container.get('boxes', []) or []:
-            if 'final_orientation' in b and b.get('final_orientation') is not None and 'final_orientation_desc' not in b:
-                b['final_orientation_desc'] = _orientation_desc(b.get('final_orientation'))
-
-    # The best_assignment from ALNS already contains the detailed placement info.
+        container_copy = dict(container)
+        container_copy.pop('boxes', None)
+        output_assignment.append(container_copy)
     with open(args.output, 'w') as f:
-        json.dump(best_assignment, f, indent=2)
+        json.dump(output_assignment, f, indent=2)
 
     print("Process completed.")
     
