@@ -1,5 +1,63 @@
-def visualize_solution(time_taken,container, boxes, perms_list, orient, x, y, z, solver, n, status_str=None, container_id=None):
+from __future__ import annotations
+
+from types import ModuleType
+from typing import Any, Dict, Optional, Sequence, Tuple, Union, Literal, TypedDict, Required, NotRequired, cast
+
+
+# Lightweight, runtime-safe shapes for inputs
+class ContainerDict(TypedDict):
+    size: Tuple[float, float, float]
+    id: NotRequired[Union[str, int]]
+
+
+class BoxDict(TypedDict):
+    size: Tuple[float, float, float]
+    id: NotRequired[Union[str, int]]
+    # rotation allowed for the box when placed
+    rotation: NotRequired[Literal["none", "z", "free"]]
+
+
+class PlacementDict(TypedDict):
+    position: Tuple[float, float, float]
+    orientation: Optional[int]
+    size: Tuple[float, float, float]
+    rotation_type: NotRequired[Literal["none", "z", "free"]]
+
+
+ContainerLike = Union[Tuple[float, float, float], ContainerDict]
+
+
+def visualize_solution(
+    time_taken: Optional[float],
+    container: ContainerLike,
+    boxes: Sequence[BoxDict],
+    placements: Sequence[PlacementDict],
+    status_str: Optional[str] = None,
+) -> ModuleType:
+    """Render a 3D visualization of the container and placed boxes.
+
+    Args:
+        time_taken: Solver time in seconds (float), used in the title.
+        container: Container definition. Either:
+            - size triple [L, W, H], or
+            - dict with keys: 'size' = [L, W, H] and optional 'id'.
+        boxes: List of box dicts (metadata; used for ids and original sizes).
+    placements: List of dicts with keys 'position', 'orientation', 'size', 'rotation_type'.
+        status_str: Optional solver status string for the title.
+    Note: If container is a dict with an 'id', it will be shown in the title.
+
+    Returns:
+        matplotlib.pyplot (plt) with the plot configured; call plt.show() to display.
+    """
+    # Ensure a non-interactive backend under pytest/headless to avoid Tk errors.
     try:
+        import os
+        import matplotlib
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            try:
+                matplotlib.use("Agg", force=True)
+            except Exception:
+                pass
         import matplotlib.pyplot as plt
         from mpl_toolkits.mplot3d.art3d import Poly3DCollection
     except ImportError:
@@ -8,10 +66,20 @@ def visualize_solution(time_taken,container, boxes, perms_list, orient, x, y, z,
         sys.exit(0)
 
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    # Precise type for 3D axes for better static typing
+    from mpl_toolkits.mplot3d.axes3d import Axes3D as Axes3DType  # type: ignore
+    ax = cast(Axes3DType, fig.add_subplot(111, projection='3d'))
 
-    # Draw container as wireframe
-    cx, cy, cz = container
+    # Normalize container input and draw container as wireframe
+    container_id_val: Optional[Union[str, int]] = None
+    if isinstance(container, dict):
+        size = container.get('size')
+        if size is None:
+            raise ValueError("container dict must contain 'size' = [L, W, H]")
+        container_id_val = container.get('id')
+        cx, cy, cz = size
+    else:
+        cx, cy, cz = container
     for s, e in [([0,0,0],[cx,0,0]), ([0,0,0],[0,cy,0]), ([0,0,0],[0,0,cz]),
                  ([cx,0,0],[cx,cy,0]), ([cx,0,0],[cx,0,cz]),
                  ([0,cy,0],[cx,cy,0]), ([0,cy,0],[0,cy,cz]),
@@ -19,16 +87,39 @@ def visualize_solution(time_taken,container, boxes, perms_list, orient, x, y, z,
                  ([cx,cy,0],[cx,cy,cz]), ([cx,0,cz],[cx,cy,cz]), ([0,cy,cz],[cx,cy,cz])]:
         ax.plot3D(*zip(s, e), color="black", linewidth=0.5)
 
+    # Helper: map orientation index to (l,w,h) perm without needing perms_list
+    def _orientation_to_perm(
+        size: Tuple[float, float, float],
+        orient_idx: Optional[int],
+        rotation_type: Literal["none", "z", "free"],
+    ) -> Optional[Tuple[float, float, float]]:
+        l0, w0, h0 = size
+        if rotation_type == "none":
+            mapping = [(l0, w0, h0)]
+        elif rotation_type == "z":
+            mapping = [(l0, w0, h0), (w0, l0, h0)]
+        elif rotation_type == "free":
+            mapping = [
+                (l0, w0, h0), (l0, h0, w0), (w0, l0, h0),
+                (w0, h0, l0), (h0, l0, w0), (h0, w0, l0)
+            ]
+        else:
+            raise ValueError(f"Invalid rotation_type in placement: {rotation_type}. Must be one of ['none','z','free'].")
+        # Guard against bad indices
+        if orient_idx is None or orient_idx < 0 or orient_idx >= len(mapping):
+            return None
+        return mapping[orient_idx]
+
     # Draw each box as a colored solid
-    import random
-    colors = plt.cm.get_cmap('tab20', n)
-    for i in range(n):
-        xi = solver.Value(x[i])
-        yi = solver.Value(y[i])
-        zi = solver.Value(z[i])
-        orient_val = [solver.Value(orient[i][k]) for k in range(len(orient[i]))]
-        orient_idx = orient_val.index(1)
-        l, w, h = perms_list[i][orient_idx]
+    n_local = len(placements)
+    # Use modern, non-deprecated colormap access. We don't rely on LUT sizing
+    # to keep compatibility across Matplotlib versions.
+    colors = plt.get_cmap('tab20')
+    for i in range(n_local):
+        placement = placements[i]
+        xi, yi, zi = placement['position']
+        orient_idx = placement['orientation']
+        l, w, h = placement['size']
         # Vertices of the box
         verts = [
             [xi, yi, zi],
@@ -48,33 +139,26 @@ def visualize_solution(time_taken,container, boxes, perms_list, orient, x, y, z,
             [verts[1], verts[2], verts[6], verts[5]],
             [verts[4], verts[7], verts[3], verts[0]],
         ]
-        box = Poly3DCollection(faces, alpha=0.5, facecolor=colors(i), edgecolor='k')
+        box = Poly3DCollection(
+            faces,
+            alpha=0.5,
+            facecolor=colors(i % colors.N),
+            edgecolor='k'
+        )
         ax.add_collection3d(box)
 
         # Draw original axes after rotation using quivers
         center_x = xi + l / 2
         center_y = yi + w / 2
         center_z = zi + h / 2
-        box_id = boxes[i].get('id', i+1)
-        rotation_type = boxes[i].get('rotation', 'free')
-        label = f"{box_id} (rot={rotation_type})"
-        # try:
-        #     import matplotlib.patheffects as path_effects
-        #     ax.text(
-        #         center_x, center_y, center_z + h/4,  # offset above center
-        #         label,
-        #         color='yellow',
-        #         fontsize=10,
-        #         ha='center',
-        #         va='center',
-        #         weight='bold',
-        #         path_effects=[path_effects.withStroke(linewidth=2, foreground='black')]
-        #     )
-        # except ImportError:
-        #     ax.text(center_x, center_y, center_z + h/4, label, color='yellow', fontsize=14, ha='center', va='center', weight='bold')
-
-        perm = perms_list[i][orient_idx]
-        l0, w0, h0 = boxes[i]['size']
+        # Compute perm from orientation + rotation_type
+        rt_candidate = placement.get('rotation_type') or boxes[i].get('rotation')
+        if rt_candidate not in ('none','z','free'):
+            raise ValueError(f"Invalid or missing rotation_type for placement/box {placements[i].get('id', i)}: {rt_candidate}")
+        rotation_type: Literal['none','z','free'] = rt_candidate  # type: ignore[assignment]
+        perm = _orientation_to_perm(boxes[i]['size'], orient_idx, rotation_type)
+        if perm is None:
+            perm = (l, w, h)  # last resort: use effective size
         orig_axes = []
         used = [False, False, False]
         for val in perm:
@@ -98,10 +182,10 @@ def visualize_solution(time_taken,container, boxes, perms_list, orient, x, y, z,
     ax.set_xlim(0, cx)
     ax.set_ylim(0, cy)
     ax.set_zlim(0, cz)
-    ax.set_box_aspect([cx, cy, cz])
+    ax.set_box_aspect([cx, cy, cz])  # type: ignore[arg-type]
     title = '3D Container Packing Solution'
-    if container_id is not None:
-        title += f' (Container Id: {container_id})'
+    if container_id_val is not None:
+        title += f' (Container Id: {container_id_val})'
     if status_str:
         title += f'\nSolver status: {status_str}'
     if time_taken:

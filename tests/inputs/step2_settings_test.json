@@ -1,0 +1,12 @@
+{
+  "symmetry_mode": "simple",
+  "solver_phase2_max_time_in_seconds": 0.3,
+  "log_search_progress": false,
+  "prefer_orientation_where_side_with_biggest_surface_is_at_the_bottom_weight": 0,
+  "prefer_maximize_surface_contact_weight": 0,
+  "prefer_large_base_lower_non_linear_weight": 0,
+  "prefer_large_base_lower_weight": 0,
+  "prefer_put_boxes_by_volume_lower_z_weight": 0,
+  "prefer_total_floor_area_weight": 0,
+  "anchor_mode": null
+}

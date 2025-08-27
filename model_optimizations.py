@@ -173,42 +173,40 @@ def add_symmetry_breaking_for_identical_boxes(model, boxes, x, y, z, symmetry_mo
         model: The CpModel instance.
         boxes: List of box dicts, each with 'size' and 'rotation' keys.
         x, y, z: Lists of IntVar, coordinates of the lower corner of each box.
-        symmetry_mode: 'simple' or 'full'.
+        symmetry_mode: 'simple' or 'full'. If None or other, no constraints are added.
         container: Tuple/list of container dimensions (length, width, height).
     """
-    n: int = len(boxes)
-    axis_names: List[str] = ['x', 'y', 'z']
+    # Only apply symmetry breaking if a valid mode is specified
+    if symmetry_mode not in ['simple', 'full']:
+        return
+
+    # Group identical boxes and apply constraints
+    from collections import defaultdict
+    identical_boxes_map = defaultdict(list)
+    for i, box in enumerate(boxes):
+        # Create a stable key for grouping: size tuple + rotation type
+        key = (tuple(box['size']), box.get('rotation', 'free'))
+        identical_boxes_map[key].append(i)
+
     axis_vars: List[List[IntVar]] = [x, y, z]
     max_axis: int = max(enumerate(container), key=lambda t: t[1])[0]  # 0=x, 1=y, 2=z
-    for i in range(n):
-        for j in range(i + 1, n):
-            if (
-                boxes[i]['size'] == boxes[j]['size']
-                and boxes[i].get('rotation', 'free') == boxes[j].get('rotation', 'free')
-            ):
+
+    for group in identical_boxes_map.values():
+        if len(group) < 2:
+            continue
+
+        # Apply ordering constraints for each pair within the group
+        for i_idx in range(len(group)):
+            for j_idx in range(i_idx + 1, len(group)):
+                i = group[i_idx]
+                j = group[j_idx]
+                
                 if symmetry_mode == 'simple':
+                    # Simple ordering on one axis
                     model.Add(axis_vars[max_axis][i] <= axis_vars[max_axis][j])
-                else:
-                    b_xless: BoolVarT = model.NewBoolVar(f'sb_xless_{i}_{j}')
-                    b_xeq: BoolVarT = model.NewBoolVar(f'sb_xeq_{i}_{j}')
-                    b_yless: BoolVarT = model.NewBoolVar(f'sb_yless_{i}_{j}')
-                    b_yeq: BoolVarT = model.NewBoolVar(f'sb_yeq_{i}_{j}')
-                    model.Add(x[i] < x[j]).OnlyEnforceIf(b_xless)
-                    model.Add(x[i] >= x[j]).OnlyEnforceIf(b_xless.Not())
-                    model.Add(x[i] == x[j]).OnlyEnforceIf(b_xeq)
-                    model.Add(x[i] != x[j]).OnlyEnforceIf(b_xeq.Not())
-                    model.Add(y[i] < y[j]).OnlyEnforceIf(b_yless)
-                    model.Add(y[i] >= y[j]).OnlyEnforceIf(b_yless.Not())
-                    model.Add(y[i] == y[j]).OnlyEnforceIf(b_yeq)
-                    model.Add(y[i] != y[j]).OnlyEnforceIf(b_yeq.Not())
-                    b_xy_eq: BoolVarT = model.NewBoolVar(f'sb_xyeq_{i}_{j}')
-                    model.AddBoolAnd([b_xeq, b_yeq]).OnlyEnforceIf(b_xy_eq)
-                    model.AddBoolOr([b_xeq.Not(), b_yeq.Not()]).OnlyEnforceIf(b_xy_eq.Not())
-                    model.Add(z[i] <= z[j]).OnlyEnforceIf(b_xy_eq)
-                    b_xeq_and_yless: BoolVarT = model.NewBoolVar(f'sb_xeq_yless_{i}_{j}')
-                    model.AddBoolAnd([b_xeq, b_yless]).OnlyEnforceIf(b_xeq_and_yless)
-                    model.AddBoolOr([b_xeq.Not(), b_yless.Not()]).OnlyEnforceIf(b_xeq_and_yless.Not())
-                    model.AddBoolOr([b_xless, b_xeq_and_yless, b_xy_eq])
+                elif symmetry_mode == 'full':
+                    # Full lexicographical ordering using the efficient built-in method
+                    model.AddLexicographicalComparison([x[i], y[i], z[i]], [x[j], y[j], z[j]])
 
 def get_total_floor_area_covered(model, n, on_floor_vars, l_eff, w_eff, container):
     from ortools.sat.python.cp_model import CpModel, IntVar, BoolVarT

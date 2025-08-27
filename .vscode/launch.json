@@ -15,19 +15,20 @@
             "name": "Debug Bin Packing (step2)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/step2_container_box_placement_in_container.py",
+            "program": "${workspaceFolder}/step2_box_placement_in_container.py",
             "args": [
                 "inputs/step2_sample_packing_data_with_rotation.json"
             ],
             "console": "integratedTerminal"
         },
         {
-            "name": "Debug Bin Packing (step1)",
+            "name": "Debug Bin Packing (step1 only)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/step1_box_partition_in_containers.py",
             "args": [
-                "inputs/step1_input_data_50_to_split.json"
+                "inputs/step1_input_data_50_to_split_2_no_phase_2.json",
+                "./outputs/out.json"   
             ],
             "console": "integratedTerminal"
         },
@@ -38,8 +39,7 @@
             "program": "${workspaceFolder}/step1_box_partition_in_containers.py",
             "args": [
                 "inputs/step1_input_data_50_to_split.json",
-                "./outputs/out.json",
-                "inputs/step2_settings_a.json"
+                "./outputs/out.json"
             ],
             "console": "integratedTerminal"
         },
@@ -50,10 +50,45 @@
             "program": "${workspaceFolder}/step1_box_partition_in_containers.py",
             "args": [
                 "inputs/step1_input_data_50_to_split_2.json",
-                "./outputs/out.json",
-                "inputs/step2_settings_a.json"
+                "./outputs/out.json"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "ALNS step1_input_data_50_to_split_4_simple.json",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/alns_container_loading.py",
+            "args": [
+                "inputs/step1_input_data_50_to_split_4_simple.json",
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "ALNS alns_input_data_50_items_1.json",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/alns_container_loading.py",
+            "args": [
+                "inputs/alns_input_data_50_items_1.json",
+            ],
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "ALNS MAIN alns_input_data_50_items_1.json",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "args": [
+                "--input",
+                "inputs/alns_input_data_50_items_1.json",
+                "--output",
+                "outputs/alns_out.json",
+                "--verbose"
             ],
             "console": "integratedTerminal"
         }
+        
     ]
 }

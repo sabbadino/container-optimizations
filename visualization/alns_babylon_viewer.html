@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ALNS Container Viewer (Babylon.js)</title>
+  <style>
+  html, body { height: 100%; margin: 0; padding: 0; background: #ffffff; color: #1a1a1a; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+    #toolbar { position: absolute; top: 8px; left: 8px; z-index: 10; background: rgba(20,22,28,0.85); border: 1px solid #2a2f3a; border-radius: 8px; padding: 8px 10px; display: flex; align-items: center; gap: 8px; backdrop-filter: blur(6px); }
+    #toolbar button, #toolbar label { background: #1b1f2a; color: #e6e6e6; border: 1px solid #303642; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+    #toolbar button:hover, #toolbar label:hover { background: #222838; }
+    #toolbar input[type="file"] { display: none; }
+    #info {
+      font-size: 16px;
+      font-weight: bold;
+      opacity: 0.95;
+      margin-left: 24px;
+      color: #ffe066;
+      background: rgba(32,32,0,0.08);
+      padding: 2px 10px;
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+      transition: background 0.2s;
+    }
+    #renderCanvas { width: 100%; height: 100%; display: block; }
+  </style>
+  <!-- Babylon.js CDN -->
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+</head>
+<body>
+  <div id="toolbar">
+  <div id="containerTabs" style="position:absolute;top:50px;left:8px;z-index:11;background:rgba(20,22,28,0.85);border-radius:8px;padding:4px 8px;display:flex;gap:6px;"></div>
+  <label for="fileInput">Load JSON…</label>
+  <input id="fileInput" type="file" accept="application/json,.json" />
+  <button id="resetCamera">Reset camera</button>
+  <label><input type="checkbox" id="toggleContainer" checked /> Container</label>
+  <label><input type="checkbox" id="toggleEdges" checked /> Box edges</label>
+  <button id="toolNone">Tool: None</button>
+  <button id="toolMove">Tool: Move</button>
+  <button id="toolRotate">Tool: Rotate</button>
+  <button id="toolHide">Tool: Hide</button>
+  <label><input type="checkbox" id="toggleSnap" checked /> Snap</label>
+  <span id="info"></span>
+  </div>
+  <canvas id="renderCanvas"></canvas>
+  <div id="boxListPanel" style="position:absolute;top:8px;right:8px;z-index:12;background:rgba(20,22,28,0.85);border-radius:8px;padding:10px 12px;min-width:160px;max-height:80vh;overflow-y:auto;box-shadow:0 2px 12px rgba(0,0,0,0.08);color:#e6e6e6;font-size:14px;"></div>
+
+
+  <script>
+// Tab UI logic
+let containersData = [];
+let currentContainerIdx = 0;
+function renderTabs() {
+  const tabsDiv = document.getElementById('containerTabs');
+  tabsDiv.innerHTML = '';
+  containersData.forEach((container, idx) => {
+    const btn = document.createElement('button');
+    btn.textContent = `Container ${container.id ?? idx+1}`;
+    btn.style.background = idx === currentContainerIdx ? '#2a2f3a' : '#1b1f2a';
+    btn.style.color = '#e6e6e6';
+    btn.style.border = '1px solid #303642';
+    btn.style.borderRadius = '6px';
+    btn.style.padding = '4px 10px';
+    btn.style.cursor = 'pointer';
+    btn.onclick = () => {
+      currentContainerIdx = idx;
+      renderTabs();
+      buildContainerAndBoxes(containersData[currentContainerIdx]);
+      updateBoxListPanel();
+    };
+    tabsDiv.appendChild(btn);
+  });
+}
+
+    // Basic error capture to surface issues in-page
+    function updateInfo(text) {
+      document.getElementById('info').textContent = text || '';
+    }
+    window.addEventListener('error', (e) => {
+      updateInfo('Error: ' + (e?.message || 'Unknown error'));
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      const msg = (e && (e.reason?.message || e.reason)) || 'Unknown rejection';
+      updateInfo('Unhandled promise rejection: ' + msg);
+    });
+
+    // Utility: simple seeded color based on id
+    function colorFromId(id) {
+      const hue = (id * 47) % 360; // pseudo-random but consistent
+      const sat = 0.7, val = 0.95;
+      const c = val * sat;
+      const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+      const m = val - c;
+      let r=0,g=0,b=0;
+      if (hue < 60) [r,g,b] = [c,x,0];
+      else if (hue < 120) [r,g,b] = [x,c,0];
+      else if (hue < 180) [r,g,b] = [0,c,x];
+      else if (hue < 240) [r,g,b] = [0,x,c];
+      else if (hue < 300) [r,g,b] = [x,0,c];
+      else [r,g,b] = [c,0,x];
+      return new BABYLON.Color3(r + m, g + m, b + m);
+    }
+
+  const canvas = document.getElementById('renderCanvas');
+  let engine, scene, camera;
+  let containerMesh = null;
+  let boxesParent = null;
+  let axesViewer = null;
+  let axesLabels = [];
+  let currentContainerSize = null; // [L,W,H]
+  let axesRoot = null; // transform node anchoring axes at container center
+  let highlightLayer = null;
+  let gizmoManager = null;
+  let selectedMesh = null;
+  let currentTool = 'none';
+  const moveSnap = 1;           // units
+  const rotateSnap = Math.PI/2; // 90 degrees
+  // Gizmo wiring flags and last valid transform
+  let gizmoPositionWired = false;
+  let gizmoRotationWired = false;
+  let lastValidTransform = null; // { position: Vector3, rotation: Vector3 | Quaternion }
+
+    function createScene() {
+      scene = new BABYLON.Scene(engine);
+  scene.clearColor = new BABYLON.Color4(1, 1, 1, 1);
+
+  camera = new BABYLON.ArcRotateCamera('camera', -Math.PI / 2.2, Math.PI / 3, 30, new BABYLON.Vector3(0, 0, 0), scene);
+  // Use Z-up convention
+  camera.upVector = new BABYLON.Vector3(0, 0, 1);
+      camera.attachControl(canvas, true);
+      camera.wheelPrecision = 50; // smoother zoom
+      camera.panningSensibility = 50;
+
+      const light = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0.3, 1, -0.3), scene);
+      light.intensity = 0.9;
+
+      const env = scene.createDefaultEnvironment({
+        createSkybox: false,
+        createGround: false,
+      });
+
+  // Highlight layer for selection
+  highlightLayer = new BABYLON.HighlightLayer('hl', scene);
+  // Gizmo manager for move/rotate
+  gizmoManager = new BABYLON.GizmoManager(scene);
+  gizmoManager.usePointerToAttachGizmos = false;
+  gizmoManager.positionGizmoEnabled = false;
+  gizmoManager.rotationGizmoEnabled = false;
+  if (gizmoManager.gizmos?.positionGizmo) gizmoManager.gizmos.positionGizmo.snapDistance = moveSnap;
+  if (gizmoManager.gizmos?.rotationGizmo) gizmoManager.gizmos.rotationGizmo.snapDistance = rotateSnap;
+
+  // Ensure drag observables are wired
+  ensureGizmoObservables();
+
+      return scene;
+    }
+
+    function toCenterPosition(posLWH, sizeLWH) {
+      // Map (L,W,H) to Babylon (X,Y,Z) with Z-up, converting corner -> center
+      const [L, W, H] = sizeLWH;
+      const [pL, pW, pH] = posLWH;
+      return new BABYLON.Vector3(
+        pL + L / 2, // X (length)
+        pW + W / 2, // Y (width)
+        pH + H / 2  // Z (height, up)
+      );
+    }
+
+    function buildContainerAndBoxes(data) {
+      // Cleanup old meshes
+      if (boxesParent) boxesParent.dispose();
+      if (containerMesh) containerMesh.dispose();
+  // Dispose axes to recreate with new scale
+  disposeAxes();
+
+      boxesParent = new BABYLON.TransformNode('boxesParent', scene);
+
+      // Container
+      const [L, W, H] = data.size; // L,W,H
+      containerMesh = BABYLON.MeshBuilder.CreateBox('container', {
+        width: L,  // X (length)
+        height: W, // Y (width)
+        depth: H,  // Z (height)
+        updatable: false
+      }, scene);
+      // Move container so its corner is at (0,0,0), not centered at origin
+      containerMesh.position = toCenterPosition([0,0,0], [L,W,H]);
+
+      // Transparent box + edges for container
+      const contMat = new BABYLON.StandardMaterial('containerMat', scene);
+      contMat.diffuseColor = new BABYLON.Color3(0.3, 0.7, 1.0);
+      contMat.alpha = 0.05;
+      contMat.specularColor = BABYLON.Color3.Black();
+      containerMesh.material = contMat;
+  containerMesh.isPickable = false;
+      containerMesh.enableEdgesRendering();
+      containerMesh.edgesWidth = 1.5;
+      containerMesh.edgesColor = new BABYLON.Color4(0.3, 0.7, 1.0, 0.8);
+
+      // Placements drive actual oriented size/position
+      const placements = Array.isArray(data.placements) ? data.placements : [];
+
+      const boxMatCache = new Map();
+      function getMatFor(id) {
+        const key = id;
+        if (boxMatCache.has(key)) return boxMatCache.get(key);
+        const mat = new BABYLON.StandardMaterial(`mat-${key}`);
+        mat.diffuseColor = colorFromId(key);
+        mat.specularColor = new BABYLON.Color3(0.06,0.06,0.06);
+        mat.emissiveColor = new BABYLON.Color3(0.02,0.02,0.02);
+  mat.alpha = 0.5; // 50% transparency for boxes
+        boxMatCache.set(key, mat);
+        return mat;
+      }
+
+    for (const p of placements) {
+        const [l, w, h] = p.size; // oriented sizes in L,W,H
+        const mesh = BABYLON.MeshBuilder.CreateBox(`box-${p.id}` , {
+          width: l,   // X
+          height: w,  // Y
+          depth: h,   // Z (up)
+          updatable: false
+        }, scene);
+        mesh.position = toCenterPosition(p.position, [l,w,h]);
+  mesh.material = getMatFor(p.id);
+        mesh.parent = boxesParent;
+        mesh.enableEdgesRendering();
+        mesh.edgesWidth = 1.0;
+        mesh.edgesColor = new BABYLON.Color4(0,0,0,0.85);
+  mesh.metadata = { id: p.id, size: [l,w,h], pos: p.position, rotation_type: (p.rotation_type || 'fixed') };
+      }
+
+      // Frame camera to container
+      frameCameraTo(L, W, H);
+
+  // Remember container size for axes scaling and recreate axes if toggle is on (default on)
+  currentContainerSize = [L, W, H];
+  const axesToggleEl = document.getElementById('toggleAxes');
+  const showAxes = !axesToggleEl || axesToggleEl.checked; // default on if missing
+  if (showAxes) createAxesForCurrent();
+
+      updateInfo(`Container: ${L} x ${W} x ${H} • Boxes: ${placements.length} • Status: ${data.status || 'N/A'}`);
+    }
+
+    function frameCameraTo(L, W, H) {
+      const target = toCenterPosition([0,0,0], [L,W,H]);
+      camera.setTarget(target);
+      const radius = Math.max(L, W, H) * 2.2;
+      camera.radius = radius;
+      camera.alpha = -Math.PI/3;
+      camera.beta = Math.PI/3;
+    }
+
+    // UI wiring
+    function wireUi() {
+      document.getElementById('resetCamera').addEventListener('click', () => {
+        if (!containerMesh) return;
+        const bb = containerMesh.getBoundingInfo().boundingBox;
+        const extents = bb.maximumWorld.subtract(bb.minimumWorld);
+        // extents.x->L, extents.y->W, extents.z->H in Z-up mapping
+        frameCameraTo(extents.x, extents.y, extents.z);
+      });
+
+      const toggleContainer = document.getElementById('toggleContainer');
+      toggleContainer.addEventListener('change', (e) => {
+        if (containerMesh) containerMesh.setEnabled(e.target.checked);
+      });
+
+      const toggleEdges = document.getElementById('toggleEdges');
+      toggleEdges.addEventListener('change', (e) => {
+        const show = e.target.checked;
+        if (!boxesParent) return;
+        boxesParent.getChildMeshes().forEach(m => {
+          if (show) {
+            if (!m.edgesRenderer) m.enableEdgesRendering();
+          } else {
+            if (m.edgesRenderer) m.disableEdgesRendering();
+          }
+        });
+      });
+
+      // Tool buttons and snapping
+      document.getElementById('toolNone').addEventListener('click', () => setTool('none'));
+      document.getElementById('toolMove').addEventListener('click', () => setTool('move'));
+      document.getElementById('toolRotate').addEventListener('click', () => setTool('rotate'));
+      document.getElementById('toolHide').addEventListener('click', () => {
+        if (selectedMesh) {
+          selectedMesh.isVisible = false;
+          updateBoxListPanel();
+          deselectMesh();
+          updateInfo('Box hidden.');
+        } else {
+          updateInfo('No box selected to hide.');
+        }
+      });
+      document.getElementById('toggleSnap').addEventListener('change', (e) => {
+        const on = e.target.checked;
+        if (gizmoManager.gizmos?.positionGizmo) gizmoManager.gizmos.positionGizmo.snapDistance = on ? moveSnap : 0;
+        if (gizmoManager.gizmos?.rotationGizmo) gizmoManager.gizmos.rotationGizmo.snapDistance = on ? rotateSnap : 0;
+      });
+
+      // Axes toggle injected next to toolbar if not present
+      if (!document.getElementById('toggleAxes')) {
+        const label = document.createElement('label');
+        label.innerHTML = '<input type="checkbox" id="toggleAxes" checked /> Axes';
+        document.getElementById('toolbar').insertBefore(label, document.getElementById('info'));
+        const input = label.querySelector('input');
+        input.addEventListener('change', (e) => {
+          const show = e.target.checked;
+          if (show) createAxesForCurrent(); else disposeAxes();
+        });
+      }
+
+      const fileInput = document.getElementById('fileInput');
+      fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+          let text = await file.text();
+          if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+          text = text.trim();
+          const raw = JSON.parse(text);
+          containersData = normalizeContainers(raw); // array of containers
+          currentContainerIdx = 0;
+          renderTabs();
+          buildContainerAndBoxes(containersData[currentContainerIdx]);
+            updateBoxListPanel();
+          updateInfo(`Loaded ${file.name} • ${containersData.length} container(s)`);
+        } catch (err) {
+          console.error(err);
+          updateInfo('Failed to load JSON: ' + (err?.message || err));
+        }
+      });
+
+  // Hover tooltip in console
+      scene.onPointerObservable.add((pointerInfo) => {
+        if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERMOVE) {
+          const pick = scene.pick(scene.pointerX, scene.pointerY);
+          if (pick?.hit && pick.pickedMesh && pick.pickedMesh.metadata?.id) {
+            const md = pick.pickedMesh.metadata;
+    const rt = md.rotation_type ? ` • rot ${String(md.rotation_type)}` : '';
+    updateInfo(`Box ${md.id}${md.groupId !== undefined ? ' (group ' + md.groupId + ')' : ''} • size ${md.size.join('x')} @ [${md.pos.join(', ')}]${rt}`);
+          }
+        }
+      });
+
+      // Click to select/deselect
+      scene.onPointerObservable.add((pointerInfo) => {
+        if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN) {
+          const pick = scene.pick(scene.pointerX, scene.pointerY);
+          if (!pick?.hit) {
+            // Clicked empty space: deselect
+            deselectMesh();
+            return;
+          }
+          if (pick.pickedMesh?.name?.startsWith('box-')) {
+            selectMesh(pick.pickedMesh);
+            return;
+          }
+          // Otherwise (e.g., gizmo handles, utility layer meshes), keep current selection
+        }
+      });
+    }
+
+    // Boot with guard for missing Babylon (e.g., CDN blocked)
+    function boot() {
+      if (typeof BABYLON === 'undefined') {
+        updateInfo('Babylon.js failed to load. Check internet access to cdn.babylonjs.com or use a local copy.');
+        console.error('Babylon.js is undefined.');
+        return;
+      }
+      engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, antialias: true });
+      scene = createScene();
+      wireUi();
+
+
+  // Show info message prompting user to select 'Load JSON'
+  updateInfo("Select 'Load JSON' to display the box placement");
+
+      startClampLoop();
+      engine.runRenderLoop(() => scene.render());
+      window.addEventListener('resize', () => engine.resize());
+    }
+
+    boot();
+
+    // Keep selected mesh inside container when moving
+    function clampMeshInsideContainer(mesh) {
+      if (!mesh || !currentContainerSize) return;
+      const [L, W, H] = currentContainerSize;
+      // Ensure bounds are current
+      mesh.computeWorldMatrix(true);
+      const bb = mesh.getBoundingInfo().boundingBox;
+      const min = bb.minimumWorld;
+      const max = bb.maximumWorld;
+      let dx = 0, dy = 0, dz = 0;
+      if (min.x < 0) dx = -min.x; else if (max.x > L) dx = L - max.x;
+      if (min.y < 0) dy = -min.y; else if (max.y > W) dy = W - max.y;
+      if (min.z < 0) dz = -min.z; else if (max.z > H) dz = H - max.z;
+      if (dx || dy || dz) mesh.position.addInPlace(new BABYLON.Vector3(dx, dy, dz));
+    }
+
+    // Per-frame clamp during move tool
+    function startClampLoop() {
+      if (!scene) return;
+      scene.onBeforeRenderObservable.add(() => {
+        if (selectedMesh && currentTool === 'move') clampMeshInsideContainer(selectedMesh);
+      });
+    }
+
+    // Selection helpers
+    function setTool(mode) {
+      currentTool = mode;
+      if (!gizmoManager) return;
+      gizmoManager.positionGizmoEnabled = mode === 'move';
+      if (mode === 'rotate') {
+        // Enable rotation based on selected mesh rotation_type
+        const rt = getSelectedRotationType();
+        if (rt === 'none' || rt === 'fixed') {
+          gizmoManager.rotationGizmoEnabled = false;
+          updateInfo('Rotation disabled for this box');
+        } else {
+          gizmoManager.rotationGizmoEnabled = true;
+          ensureGizmoObservables();
+          configureRotationGizmoForMesh(selectedMesh, rt);
+        }
+      } else {
+        gizmoManager.rotationGizmoEnabled = false;
+      }
+  // Make sure observables are set when gizmos are created on-demand
+  ensureGizmoObservables();
+    }
+
+    function selectMesh(mesh) {
+      if (selectedMesh === mesh) return;
+      deselectMesh();
+      selectedMesh = mesh;
+      // Highlight selection by increasing edge width and color
+      mesh.edgesWidth = 4.0;
+      mesh.edgesColor = new BABYLON.Color4(1, 1, 0, 1); // bright yellow edges
+      if (gizmoManager) gizmoManager.attachToMesh(mesh);
+      setTool(currentTool);
+      if (currentTool === 'rotate') {
+        const rt = getSelectedRotationType();
+        configureRotationGizmoForMesh(selectedMesh, rt);
+      }
+    }
+
+    function deselectMesh() {
+      if (!selectedMesh) return;
+      // Restore edge width and color
+      selectedMesh.edgesWidth = 1.0;
+      selectedMesh.edgesColor = new BABYLON.Color4(0, 0, 0, 0.85);
+      selectedMesh = null;
+      if (gizmoManager) gizmoManager.attachToMesh(null);
+    }
+
+    // --- Overlap prevention utilities ---
+    function ensureGizmoObservables() {
+      if (!gizmoManager) return;
+      // Position gizmo
+      const pg = gizmoManager.gizmos?.positionGizmo;
+      if (pg && !gizmoPositionWired) {
+        gizmoPositionWired = true;
+        pg.onDragStartObservable.add(() => { captureLastTransform(); });
+        pg.onDragEndObservable.add(() => { handleDragEndValidation(); });
+      }
+      // Rotation gizmo
+      const rg = gizmoManager.gizmos?.rotationGizmo;
+      if (rg && !gizmoRotationWired) {
+        gizmoRotationWired = true;
+        rg.onDragStartObservable.add(() => { captureLastTransform(); });
+        rg.onDragEndObservable.add(() => { handleDragEndValidation(); });
+      }
+    }
+
+    function captureLastTransform() {
+      if (!selectedMesh) { lastValidTransform = null; return; }
+      const pos = selectedMesh.position.clone();
+      let rot = null;
+      if (selectedMesh.rotationQuaternion) rot = selectedMesh.rotationQuaternion.clone();
+      else rot = selectedMesh.rotation.clone();
+      lastValidTransform = { position: pos, rotation: rot };
+    }
+
+    function restoreLastTransform() {
+      if (!selectedMesh || !lastValidTransform) return;
+      selectedMesh.position.copyFrom(lastValidTransform.position);
+      if (selectedMesh.rotationQuaternion && lastValidTransform.rotation instanceof BABYLON.Quaternion) {
+        selectedMesh.rotationQuaternion.copyFrom(lastValidTransform.rotation);
+      } else if (lastValidTransform.rotation instanceof BABYLON.Quaternion) {
+        // Convert quaternion to Euler if needed
+        const e = lastValidTransform.rotation.toEulerAngles();
+        selectedMesh.rotation.copyFrom(e);
+      } else {
+        selectedMesh.rotation.copyFrom(lastValidTransform.rotation);
+      }
+      selectedMesh.computeWorldMatrix(true);
+    }
+
+    function handleDragEndValidation() {
+      if (!selectedMesh) return;
+  // Quantize rotation to nearest 90° per axis before validation
+  quantizeRotationToRightAngles(selectedMesh);
+      // Enforce rotation_type constraints
+      const violation = violatesRotationConstraint(selectedMesh, lastValidTransform);
+      if (violation) {
+        restoreLastTransform();
+        updateInfo(`Rotate invalid (${violation}). Reverting.`);
+        return;
+      }
+      // If overlaps with any other box, revert
+      const overlapWith = intersectsAnyBox(selectedMesh);
+      if (overlapWith) {
+        restoreLastTransform();
+        updateInfo(`Move/Rotate invalid: overlaps with box ${overlapWith.metadata?.id ?? overlapWith.name}. Reverting.`);
+        return;
+      }
+      // Otherwise, accept and update metadata (corner position and oriented size)
+      updateMeshMetadataFromWorld(selectedMesh);
+    }
+
+    function updateBoxListPanel() {
+      const panel = document.getElementById('boxListPanel');
+      panel.innerHTML = `<b>Boxes</b><br/>`;
+      const meshes = getBoxMeshes();
+      meshes.forEach(mesh => {
+        const id = mesh.metadata?.id ?? mesh.name;
+        const checked = mesh.isVisible ? 'checked' : '';
+        const div = document.createElement('div');
+        div.style.marginBottom = '4px';
+        div.innerHTML = `<label><input type="checkbox" data-boxid="${id}" ${checked}/> Box ${id}</label>`;
+        panel.appendChild(div);
+      });
+      // Wire up checkboxes
+      panel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.onchange = (e) => {
+          const boxId = cb.getAttribute('data-boxid');
+          const mesh = getBoxMeshes().find(m => String(m.metadata?.id) === boxId || m.name === boxId);
+          if (mesh) mesh.isVisible = cb.checked;
+        };
+      });
+    }
+
+    function getBoxMeshes() {
+      if (!boxesParent) return [];
+      return boxesParent.getChildMeshes().filter(m => m && m.metadata && m.name?.startsWith('box-'));
+    }
+
+    function getOBB(mesh) {
+      mesh.computeWorldMatrix(true);
+      const wm = mesh.getWorldMatrix();
+      const rot = wm.getRotationMatrix();
+      const center = mesh.getAbsolutePosition().clone(); // center of box
+      const sx = mesh.scaling?.x ?? 1, sy = mesh.scaling?.y ?? 1, sz = mesh.scaling?.z ?? 1;
+      const size = (mesh.metadata?.size && mesh.metadata.size.length === 3) ? mesh.metadata.size : [
+        mesh.getBoundingInfo().boundingBox.extendSizeWorld.x * 2,
+        mesh.getBoundingInfo().boundingBox.extendSizeWorld.y * 2,
+        mesh.getBoundingInfo().boundingBox.extendSizeWorld.z * 2,
+      ];
+      const half = [0.5 * size[0] * sx, 0.5 * size[1] * sy, 0.5 * size[2] * sz];
+      const ax = BABYLON.Vector3.TransformNormal(BABYLON.Axis.X, rot).normalize();
+      const ay = BABYLON.Vector3.TransformNormal(BABYLON.Axis.Y, rot).normalize();
+      const az = BABYLON.Vector3.TransformNormal(BABYLON.Axis.Z, rot).normalize();
+      return { center, axes: [ax, ay, az], half };
+    }
+
+    function projectRadius(axes, half, L) {
+      // Sum of half extents projected onto axis L
+      return Math.abs(BABYLON.Vector3.Dot(axes[0], L)) * half[0]
+           + Math.abs(BABYLON.Vector3.Dot(axes[1], L)) * half[1]
+           + Math.abs(BABYLON.Vector3.Dot(axes[2], L)) * half[2];
+    }
+
+    function obbOverlapSAT(a, b) {
+      // Based on standard 3D OBB SAT: test axes A0..A2, B0..B2, and cross products Ai x Bj
+      const T = b.center.subtract(a.center);
+      const axesToTest = [];
+      for (let i=0;i<3;i++) axesToTest.push(a.axes[i]);
+      for (let i=0;i<3;i++) axesToTest.push(b.axes[i]);
+      for (let i=0;i<3;i++) {
+        for (let j=0;j<3;j++) {
+          const c = BABYLON.Vector3.Cross(a.axes[i], b.axes[j]);
+          if (c.lengthSquared() > 1e-10) axesToTest.push(c.normalize());
+        }
+      }
+      for (const L of axesToTest) {
+        const ra = projectRadius(a.axes, a.half, L);
+        const rb = projectRadius(b.axes, b.half, L);
+        const dist = Math.abs(BABYLON.Vector3.Dot(T, L));
+        if (dist > ra + rb - 1e-9) return false; // separated on L (allow touching)
+      }
+      return true; // overlap or touch inside tolerance
+    }
+
+    function intersectsAnyBox(mesh) {
+      const obbA = getOBB(mesh);
+      const boxes = getBoxMeshes();
+      for (const other of boxes) {
+        if (other === mesh) continue;
+        const obbB = getOBB(other);
+        if (obbOverlapSAT(obbA, obbB)) return other;
+      }
+      return null;
+    }
+
+    function updateMeshMetadataFromWorld(mesh) {
+      // Update corner position in LWH using world AABB min. Keep original size.
+      const bb = mesh.getBoundingInfo().boundingBox;
+      const min = bb.minimumWorld;
+      const pos = [min.x, min.y, min.z]; // corner at world origin-based container
+      if (!mesh.metadata) mesh.metadata = {};
+      mesh.metadata.pos = pos;
+    }
+
+    // --- Rotation quantization (90° multiples) ---
+    function snapAngle(angle, step) {
+      return Math.round(angle / step) * step;
+    }
+
+    function quantizeRotationToRightAngles(mesh) {
+      const step = Math.PI / 2; // 90 degrees
+      if (mesh.rotationQuaternion) {
+        const e = mesh.rotationQuaternion.toEulerAngles();
+        const rx = snapAngle(e.x, step);
+        const ry = snapAngle(e.y, step);
+        const rz = snapAngle(e.z, step);
+        mesh.rotationQuaternion = BABYLON.Quaternion.FromEulerAngles(rx, ry, rz);
+      } else if (mesh.rotation) {
+        mesh.rotation.x = snapAngle(mesh.rotation.x, step);
+        mesh.rotation.y = snapAngle(mesh.rotation.y, step);
+        mesh.rotation.z = snapAngle(mesh.rotation.z, step);
+      }
+      mesh.computeWorldMatrix(true);
+    }
+
+    function getSelectedRotationType() {
+      const rt = selectedMesh?.metadata?.rotation_type;
+      return typeof rt === 'string' ? rt.toLowerCase() : 'fixed';
+    }
+
+    function configureRotationGizmoForMesh(mesh, rotationType) {
+      if (!mesh || !gizmoManager?.gizmos?.rotationGizmo) return;
+      const rt = (rotationType || mesh.metadata?.rotation_type || 'fixed').toLowerCase();
+      const rg = gizmoManager.gizmos.rotationGizmo;
+      const enableAxis = (axis, on) => {
+        try { if (axis) axis.isEnabled = !!on; } catch {}
+      };
+      if (rt === 'none' || rt === 'fixed') {
+        // No rotation allowed
+        enableAxis(rg.xGizmo, false);
+        enableAxis(rg.yGizmo, false);
+        enableAxis(rg.zGizmo, false);
+      } else if (rt === 'z') {
+        // Only Z (up) axis rotation
+        enableAxis(rg.xGizmo, false);
+        enableAxis(rg.yGizmo, false);
+        enableAxis(rg.zGizmo, true);
+      } else {
+        // free: all axes
+        enableAxis(rg.xGizmo, true);
+        enableAxis(rg.yGizmo, true);
+        enableAxis(rg.zGizmo, true);
+      }
+    }
+
+    function rotationToEuler(mesh) {
+      if (!mesh) return { x: 0, y: 0, z: 0 };
+      if (mesh.rotationQuaternion) {
+        const e = mesh.rotationQuaternion.toEulerAngles();
+        return { x: e.x, y: e.y, z: e.z };
+      }
+      return { x: mesh.rotation.x, y: mesh.rotation.y, z: mesh.rotation.z };
+    }
+
+    function violatesRotationConstraint(mesh, fromTransform) {
+      const rt = (mesh?.metadata?.rotation_type || 'fixed').toLowerCase();
+      if (!fromTransform || (rt !== 'none' && rt !== 'fixed' && rt !== 'z')) return null;
+      const step = Math.PI / 2;
+      const cur = rotationToEuler(mesh);
+      const was = fromTransform.rotation instanceof BABYLON.Quaternion
+        ? fromTransform.rotation.toEulerAngles()
+        : fromTransform.rotation;
+      // Quantize for robust comparison
+      const curQ = { x: snapAngle(cur.x, step), y: snapAngle(cur.y, step), z: snapAngle(cur.z, step) };
+      const wasQ = { x: snapAngle(was.x, step), y: snapAngle(was.y, step), z: snapAngle(was.z, step) };
+      const changedX = Math.abs(curQ.x - wasQ.x) > 1e-6;
+      const changedY = Math.abs(curQ.y - wasQ.y) > 1e-6;
+      const changedZ = Math.abs(curQ.z - wasQ.z) > 1e-6;
+      if (rt === 'none' || rt === 'fixed') {
+        if (changedX || changedY || changedZ) return 'rotation locked';
+      } else if (rt === 'z') {
+        if (changedX || changedY) return 'only Z-axis rotation allowed';
+      }
+      return null;
+    }
+
+    function disposeAxes() {
+      if (axesViewer) { axesViewer.dispose(); axesViewer = null; }
+      for (const m of axesLabels) { try { m.dispose(); } catch {} }
+      axesLabels = [];
+  if (axesRoot) { try { axesRoot.dispose(); } catch {} axesRoot = null; }
+    }
+
+    function createAxesForCurrent() {
+      if (!scene) return;
+      disposeAxes();
+      const [L, W, H] = currentContainerSize || [10,10,10];
+  // Z-up: X=L, Y=W, Z=H
+  const lenX = Math.max(0.5, L * 1.1);
+  const lenY = Math.max(0.5, W * 1.1);
+  const lenZ = Math.max(0.5, H * 1.1);
+  const coneHX = Math.max(0.2, lenX * 0.08);
+  const coneHY = Math.max(0.2, lenY * 0.08);
+  const coneHZ = Math.max(0.2, lenZ * 0.08);
+      const origin = BABYLON.Vector3.Zero();
+      axesRoot = new BABYLON.TransformNode('axesRoot', scene);
+      axesRoot.position = origin;
+
+      const matX = new BABYLON.StandardMaterial('matX', scene); matX.emissiveColor = new BABYLON.Color3(1,0.3,0.3); matX.specularColor = BABYLON.Color3.Black();
+      const matY = new BABYLON.StandardMaterial('matY', scene); matY.emissiveColor = new BABYLON.Color3(0.3,1,0.3); matY.specularColor = BABYLON.Color3.Black();
+      const matZ = new BABYLON.StandardMaterial('matZ', scene); matZ.emissiveColor = new BABYLON.Color3(0.3,0.6,1); matZ.specularColor = BABYLON.Color3.Black();
+
+      // X axis
+      const xLine = BABYLON.MeshBuilder.CreateLines('xLine', { points: [new BABYLON.Vector3(0,0,0), new BABYLON.Vector3(lenX,0,0)], colors: [new BABYLON.Color4(1,0.3,0.3,1), new BABYLON.Color4(1,0.3,0.3,1)] }, scene);
+      xLine.parent = axesRoot; xLine.isPickable = false;
+      const xCone = BABYLON.MeshBuilder.CreateCylinder('xCone', { height: coneHX, diameterTop: 0, diameterBottom: coneHX * 0.4, tessellation: 16 }, scene);
+      xCone.material = matX; xCone.isPickable = false; xCone.rotation.z = -Math.PI/2; xCone.position = new BABYLON.Vector3(lenX + coneHX/2, 0, 0); xCone.parent = axesRoot;
+
+      // Y axisz
+  const yLine = BABYLON.MeshBuilder.CreateLines('yLine', { points: [new BABYLON.Vector3(0,0,0), new BABYLON.Vector3(0,lenY,0)], colors: [new BABYLON.Color4(0.3,1,0.3,1), new BABYLON.Color4(0.3,1,0.3,1)] }, scene);
+      yLine.parent = axesRoot; yLine.isPickable = false;
+      const yCone = BABYLON.MeshBuilder.CreateCylinder('yCone', { height: coneHY, diameterTop: 0, diameterBottom: coneHY * 0.4, tessellation: 16 }, scene);
+      yCone.material = matY; yCone.isPickable = false; yCone.position = new BABYLON.Vector3(0, lenY + coneHY/2, 0); yCone.parent = axesRoot;
+
+      // Z axis
+  const zLine = BABYLON.MeshBuilder.CreateLines('zLine', { points: [new BABYLON.Vector3(0,0,0), new BABYLON.Vector3(0,0,lenZ)], colors: [new BABYLON.Color4(0.3,0.6,1,1), new BABYLON.Color4(0.3,0.6,1,1)] }, scene);
+      zLine.parent = axesRoot; zLine.isPickable = false;
+      const zCone = BABYLON.MeshBuilder.CreateCylinder('zCone', { height: coneHZ, diameterTop: 0, diameterBottom: coneHZ * 0.4, tessellation: 16 }, scene);
+      zCone.material = matZ; zCone.isPickable = false; zCone.rotation.x = Math.PI/2; zCone.position = new BABYLON.Vector3(0, 0, lenZ + coneHZ/2); zCone.parent = axesRoot;
+
+      // Labels beyond tips
+      axesLabels.push(createAxisLabel('X', new BABYLON.Vector3(lenX + coneHX + coneHX*0.5, 0, 0), matX.emissiveColor));
+      axesLabels.push(createAxisLabel('Y', new BABYLON.Vector3(0, lenY + coneHY + coneHY*0.5, 0), matY.emissiveColor));
+      axesLabels.push(createAxisLabel('Z', new BABYLON.Vector3(0, 0, lenZ + coneHZ + coneHZ*0.5), matZ.emissiveColor));
+    }
+
+    function placeAxisLabels(scale) {
+      const padAbs = Math.max(0.1, scale * 0.25);
+      // Ensure world matrices are up to date
+      axesRoot?.computeWorldMatrix(true);
+      if (axesViewer?.xAxisArrow && axesLabels[0]) {
+        axesViewer.xAxisArrow.computeWorldMatrix(true);
+        const max = axesViewer.xAxisArrow.getBoundingInfo().boundingBox.maximumWorld;
+        axesLabels[0].position.set(max.x + padAbs, max.y, max.z);
+      }
+      if (axesViewer?.yAxisArrow && axesLabels[1]) {
+        axesViewer.yAxisArrow.computeWorldMatrix(true);
+        const max = axesViewer.yAxisArrow.getBoundingInfo().boundingBox.maximumWorld;
+        axesLabels[1].position.set(max.x, max.y + padAbs, max.z);
+      }
+      if (axesViewer?.zAxisArrow && axesLabels[2]) {
+        axesViewer.zAxisArrow.computeWorldMatrix(true);
+        const max = axesViewer.zAxisArrow.getBoundingInfo().boundingBox.maximumWorld;
+        axesLabels[2].position.set(max.x, max.y, max.z + padAbs);
+      }
+    }
+
+    function createAxisLabel(text, position, color) {
+      const plane = BABYLON.MeshBuilder.CreatePlane('label-'+text, { size: 0.6 }, scene);
+      const dt = new BABYLON.DynamicTexture('dt-'+text, {width:256, height:256}, scene, true);
+      const ctx = dt.getContext();
+      ctx.clearRect(0,0,256,256);
+      ctx.font = 'bold 160px Segoe UI';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(0,0,0,0.0)';
+      ctx.fillRect(0,0,256,256);
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.lineWidth = 12;
+      ctx.strokeText(text, 128, 140);
+      ctx.fillText(text, 128, 140);
+      dt.update();
+      const mat = new BABYLON.StandardMaterial('mat-'+text, scene);
+      mat.diffuseTexture = dt;
+      mat.emissiveColor = color || new BABYLON.Color3(1,1,1);
+      mat.backFaceCulling = false;
+      mat.specularColor = BABYLON.Color3.Black();
+      mat.alpha = 0.9;
+      plane.material = mat;
+      plane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+      plane.position = position;
+      return plane;
+    }
+
+    // Normalize JSON into { size: [L,W,H], placements: [...] } (boxes removed from schema)
+    function normalizeSchema(raw) {
+      if (!raw) return null;
+      // If top-level is an array, try first element
+      if (Array.isArray(raw)) raw = raw[0];
+      if (!raw || typeof raw !== 'object') return null;
+
+      let size = parseSize(raw.size) || parseSize(raw.container?.size) || parseSize(raw.dimensions) || parseSize(raw.container_dimensions);
+
+      const out = { id: raw.id, size, status: raw.status };
+      const placements = arr(raw.placements) || arr(raw.results?.placements) || arr(raw.Placements) || null;
+
+      // Require placements
+      if (!placements || placements.length === 0) {
+        throw new Error("Required 'placements' array not found or empty.");
+      }
+
+      out.placements = placements.map(p => normalizePlacement(p));
+      if (!size) out.size = deriveContainerSizeFromPlacements(out.placements);
+      if (!out.size) {
+        throw new Error("Required 'size' not found and could not be derived from placements.");
+      }
+      return out;
+    }
+
+    // Accepts either a single container object or an array of containers
+    function normalizeContainers(raw) {
+      if (!raw) return [];
+      let arrRaw = Array.isArray(raw) ? raw : [raw];
+      return arrRaw.map(container => {
+        if (!container || typeof container !== 'object') return null;
+        let size = parseSize(container.size) || parseSize(container.container?.size) || parseSize(container.dimensions) || parseSize(container.container_dimensions);
+        const out = { id: container.id, size, status: container.status };
+        const placements = arr(container.placements) || arr(container.results?.placements) || arr(container.Placements) || null;
+        if (!placements || placements.length === 0) {
+          throw new Error("Required 'placements' array not found or empty.");
+        }
+        out.placements = placements.map(p => normalizePlacement(p));
+        if (!size) out.size = deriveContainerSizeFromPlacements(out.placements);
+        if (!out.size) {
+          throw new Error("Required 'size' not found and could not be derived from placements.");
+        }
+        return out;
+      }).filter(Boolean);
+    }
+
+    function arr(v) { return Array.isArray(v) ? v : null; }
+    function num(v) { return (typeof v === 'number' && Number.isFinite(v)) ? v : (typeof v === 'string' && v.trim() !== '' && !isNaN(+v) ? +v : undefined); }
+    function str(v) { return (typeof v === 'string' && v.trim() !== '') ? v : undefined; }
+
+    function parseSize(v) {
+      if (!v) return null;
+      if (Array.isArray(v) && v.length === 3) return v.map(Number);
+      if (typeof v === 'object') {
+        const L = num(v.L ?? v.l ?? v.length);
+        const W = num(v.W ?? v.w ?? v.width);
+        const H = num(v.H ?? v.h ?? v.height);
+        if ([L,W,H].every(x => typeof x === 'number')) return [L,W,H];
+      }
+      if (typeof v === 'string') {
+        const parts = v.split(/[x,; ]+/).map(s => s.trim()).filter(Boolean);
+        if (parts.length === 3 && parts.every(p => !isNaN(+p))) return parts.map(p => +p);
+      }
+      return null;
+    }
+
+    function parsePosition(v) {
+      if (!v) return null;
+      if (Array.isArray(v) && v.length === 3) return v.map(Number);
+      if (typeof v === 'object') {
+        const L = num(v.L ?? v.x ?? v.l);
+        const W = num(v.W ?? v.z ?? v.w);
+        const H = num(v.H ?? v.y ?? v.h);
+        if ([L,W,H].every(x => typeof x === 'number')) return [L,W,H];
+      }
+      if (typeof v === 'string') {
+        const parts = v.split(/[x,;, ]+/).map(s => s.trim()).filter(Boolean);
+        if (parts.length === 3 && parts.every(p => !isNaN(+p))) return parts.map(p => +p);
+      }
+      return null;
+    }
+
+    function normalizePlacement(p) {
+      const pos = parsePosition(p.position) || parsePosition(p.pos) || [0,0,0];
+      const size = parseSize(p.size) || [0,0,0];
+      const orientation = num(p.orientation);
+      return { id: p.id, position: pos, size, orientation: orientation ?? 0, rotation_type: p.rotation_type || 'fixed' };
+    }
+
+    function deriveContainerSizeFromPlacements(pls) {
+      if (!Array.isArray(pls) || !pls.length) return null;
+      let maxL = 0, maxW = 0, maxH = 0;
+      for (const p of pls) {
+        const pos = p.position; // [L,W,H] corner
+        const sz = p.size;      // [L,W,H]
+        if (!pos || !sz) continue;
+        maxL = Math.max(maxL, Number(pos[0]) + Number(sz[0]));
+        maxW = Math.max(maxW, Number(pos[1]) + Number(sz[1]));
+        maxH = Math.max(maxH, Number(pos[2]) + Number(sz[2]));
+      }
+      if (maxL && maxW && maxH) return [maxL, maxW, maxH];
+      return null;
+    }
+
+    // Map size [L,W,H] by orientation. If desc provided (e.g., "L,W,H", "W,L,H", "H,W,L"), use it.
+    function applyOrientation(size, orientation, desc) {
+      const [L, W, H] = size;
+      if (typeof desc === 'string') {
+        const parts = desc.split(',').map(s => s.trim().toUpperCase());
+        const order = parts.map(p => (p === 'L' ? L : p === 'W' ? W : H));
+        return order;
+      }
+      // Fallback mapping for integer orientation codes if needed (0..5 common)
+      const maps = [
+        [L, W, H], // 0: L,W,H
+        [L, H, W], // 1: L,H,W
+        [W, L, H], // 2: W,L,H
+        [W, H, L], // 3: W,H,L
+        [H, L, W], // 4: H,L,W
+        [H, W, L], // 5: H,W,L
+      ];
+      if (Number.isInteger(orientation) && orientation >= 0 && orientation < maps.length) return maps[orientation];
+      return [L, W, H];
+    }
+
+  </script>
+</body>
+</html>

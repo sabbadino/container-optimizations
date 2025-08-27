@@ -76,7 +76,11 @@ def create_orientation_and_dimension_variables(
         w0: int
         h0: int
         l0, w0, h0 = box['size']
-        rot: str = box.get('rotation', 'free')
+        if 'rotation' not in box:
+            raise ValueError(f"Box {box.get('id', i)} missing required field 'rotation'")
+        rot: str = box['rotation']
+        if rot not in ('none', 'z', 'free'):
+            raise ValueError(f"Invalid rotation value for box {box.get('id', i)}: {rot}. Must be one of ['none','z','free'].")
         perms: List[Tuple[int, int, int]]
         if rot == 'free':
             perms = [

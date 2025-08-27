@@ -5,13 +5,7 @@ from ortools.sat.python import cp_model
 from visualization_utils import visualize_solution
 
 
-status_dict = {
-    cp_model.OPTIMAL: 'OPTIMAL',
-    cp_model.FEASIBLE: 'FEASIBLE',
-    cp_model.INFEASIBLE: 'INFEASIBLE',
-    cp_model.MODEL_INVALID: 'MODEL_INVALID',
-    cp_model.UNKNOWN: 'UNKNOWN',
-}
+
 
 # Minimal box and container data for geometry tests
 def make_box(l, w, h, id=0):
@@ -29,9 +23,10 @@ def test_no_overlap_simple():
     x = [model.NewIntVar(0, 5, f"x_{i}") for i in range(n)]
     y = [model.NewIntVar(0, 5, f"y_{i}") for i in range(n)]
     z = [model.NewIntVar(0, 5, f"z_{i}") for i in range(n)]
-    l_eff = [5, 5]
-    w_eff = [5, 5]
-    h_eff = [5, 5]
+    # Use constants as IntVar for dimension lists to satisfy typed constraints
+    l_eff = [model.NewConstant(5) for _ in range(n)]
+    w_eff = [model.NewConstant(5) for _ in range(n)]
+    h_eff = [model.NewConstant(5) for _ in range(n)]
     add_no_overlap_constraint(model, n, x, y, z, l_eff, w_eff, h_eff)
     add_inside_container_constraint(model, n, x, y, z, l_eff, w_eff, h_eff, container)
     solver = cp_model.CpSolver()
@@ -66,14 +61,12 @@ def test_inside_container():
     assert 0 <= solver.Value(y[0]) <= 5
     assert 0 <= solver.Value(z[0]) <= 5
 
-def test_cannot_fit_geometrically_1():
+def test_no_rotation_single_tall_box_infeasible_in_shallow_container():
+    """A single tall box (1x1x4, rotation=none) cannot fit into a shallow container (4x4x1)."""
     
     from model_setup import setup_3d_bin_packing_model
     model = cp_model.CpModel()
     # Use box/cont dicts compatible with model_setup
-    boxes = [{"size": (1, 1, 4), "id": 1, "rotation": "none"}]
-    boxes = [{"size": (1, 1, 4), "id": 2, "rotation": "none"}]
-    boxes = [{"size": (1, 1, 4), "id": 3, "rotation": "none"}]
     boxes = [{"size": (1, 1, 4), "id": 4, "rotation": "none"}]        
     container = (4, 4, 1)
     n, x, y, z, perms_list, orient, l_eff, w_eff, h_eff = setup_3d_bin_packing_model(model, container, boxes)
@@ -82,10 +75,11 @@ def test_cannot_fit_geometrically_1():
     add_inside_container_constraint(model, n, x, y, z, l_eff, w_eff, h_eff, container)
     solver = cp_model.CpSolver()
     status = solver.Solve(model)
-    # Should be infeasible: cannot fit 4 such boxes in the container without rotation
+    # Should be infeasible: height 4 cannot fit in container height 1 without rotation
     assert status == cp_model.INFEASIBLE
 
-def test_can_fit_geometrically_1():
+def test_free_rotation_four_tall_boxes_rotate_flat_to_fit_shallow_container():
+    """Four tall boxes (1x1x4, rotation=free) can rotate flat to fit a shallow container (4x4x1)."""
     from model_setup import setup_3d_bin_packing_model
     model = cp_model.CpModel()
     # Use box/cont dicts compatible with model_setup
@@ -102,8 +96,7 @@ def test_can_fit_geometrically_1():
     status = solver.Solve(model)
     # Should be optimal/feasible: all 4 boxes can fit with rotation
     #assert status in (cp_model.OPTIMAL, cp_model.FEASIBLE)
-    status_str = status_dict.get(status, status)
-    print(f'Solver status: {status_str}')
+    print(f'Solver status: {status}')
     assert status == cp_model.OPTIMAL
     # Check that all boxes are placed inside the container and do not overlap, and that orientation is valid
     positions = set()
@@ -137,10 +130,29 @@ def test_can_fit_geometrically_1():
             assert separated
 
     # Visualize the solution
-    from visualization_utils import visualize_solution
-    visualize_solution(0, container, boxes, perms_list, orient, x, y, z, solver, n, status_str=status_str)
+    # Build placements to match new visualize_solution API
+    placements = []
+    for i in range(n):
+        xi = solver.Value(x[i])
+        yi = solver.Value(y[i])
+        zi = solver.Value(z[i])
+        orient_val = [solver.Value(orient[i][k]) for k in range(len(perms_list[i]))]
+        k_sel = orient_val.index(1) if 1 in orient_val else 0
+        l_sel, w_sel, h_sel = perms_list[i][k_sel]
+        placements.append({
+            "id": boxes[i].get("id", i),
+            "position": (xi, yi, zi),
+            "size": (l_sel, w_sel, h_sel),
+            "orientation": k_sel,
+        })
+    # Pass container as dict with 'size' key per visualize_solution API
+    # Include rotation_type consistent with model logic; default to 'free'
+    for p in placements:
+        p.setdefault('rotation_type', boxes[p['id']-1].get('rotation', 'free') if isinstance(p.get('id'), int) else 'free')
+    visualize_solution(0, {"size": list(container)}, boxes, placements, str(status))
 
-def test_can_fit_geometrically_2():
+def test_z_rotation_swaps_length_width_to_fit_two_planks_in_narrow_width():
+    """Two planks (1x4x1, rotation=z) fit in a 4x2x1 container by swapping L/W via z-rotation."""
     from model_setup import setup_3d_bin_packing_model
     model = cp_model.CpModel()
     # Use box/cont dicts compatible with model_setup
@@ -153,9 +165,8 @@ def test_can_fit_geometrically_2():
     add_inside_container_constraint(model, n, x, y, z, l_eff, w_eff, h_eff, container)
     solver = cp_model.CpSolver()
     status = solver.Solve(model)
-    # Should be optimal/feasible: all 4 boxes can fit with rotation
-    status_str = status_dict.get(status, status)
-    print(f'Solver status: {status_str}')
+    # Should be optimal/feasible: both boxes can fit with z-rotation
+    print(f'Solver status: {status}')
     assert status in (cp_model.OPTIMAL, cp_model.FEASIBLE)
     # Check that all boxes are placed inside the container and do not overlap, and that orientation is valid
     positions = set()
@@ -188,11 +199,8 @@ def test_can_fit_geometrically_2():
             )
             assert separated
 
-    # Visualize the solution
-    from visualization_utils import visualize_solution
-    visualize_solution(0, container, boxes, perms_list, orient, x, y, z, solver, n, status_str=status_str)
-
-def test_can_fit_geometrically_3():
+def test_free_rotation_mixed_boxes_pack_optimally_in_4x4x2():
+    """Mixed-size boxes with free rotation pack optimally inside a 4x4x2 container without overlap."""
     from model_setup import setup_3d_bin_packing_model
     model = cp_model.CpModel()
     # Use box/cont dicts compatible with model_setup
@@ -212,8 +220,7 @@ def test_can_fit_geometrically_3():
     add_inside_container_constraint(model, n, x, y, z, l_eff, w_eff, h_eff, container)
     solver = cp_model.CpSolver()
     status = solver.Solve(model)
-    status_str = status_dict.get(status, status)
-    print(f'Solver status: {status_str}')
+    print(f'Solver status: {status}')
     # Should be optimal/feasible: all 4 boxes can fit with rotation
     assert status == cp_model.OPTIMAL
     # Check that all boxes are placed inside the container and do not overlap, and that orientation is valid
@@ -247,7 +254,24 @@ def test_can_fit_geometrically_3():
             )
             assert separated
 
-    # Visualize the solution
-    from visualization_utils import visualize_solution
-    visualize_solution(0, container, boxes, perms_list, orient, x, y, z, solver, n, status_str=status_str)
+    # Build placements to match new visualize_solution API
+    placements = []
+    for i in range(n):
+        xi = solver.Value(x[i])
+        yi = solver.Value(y[i])
+        zi = solver.Value(z[i])
+        orient_val = [solver.Value(orient[i][k]) for k in range(len(perms_list[i]))]
+        k_sel = orient_val.index(1) if 1 in orient_val else 0
+        l_sel, w_sel, h_sel = perms_list[i][k_sel]
+        placements.append({
+            "id": boxes[i].get("id", i),
+            "position": (xi, yi, zi),
+            "size": (l_sel, w_sel, h_sel),
+            "orientation": k_sel,
+        })
+    # Include rotation_type; default to box's rotation or 'free'
+    for idx, p in enumerate(placements):
+        p.setdefault('rotation_type', boxes[idx].get('rotation', 'free'))
+    # Pass container as dict with 'size' key per visualize_solution API
+    visualize_solution(0, {"size": list(container)}, boxes, placements, str(status))
 
